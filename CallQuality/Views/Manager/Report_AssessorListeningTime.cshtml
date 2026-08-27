@@ -1,0 +1,124 @@
+﻿@using CallQuality.Core.Manager.ReportManager.Models
+@model AssessorListeningTimeVM
+
+@{
+    ViewData["Title"] = "Assessor Listening Time";
+}
+
+<div class="assessor-listening-page">
+
+    <div class="page-controls">
+        <label class="assessor-listening-label">Select Month:</label>
+        <input type="month" class="page-input" />
+
+        <button class="btn-common btn-search">
+             Search
+        </button>
+
+        <button class="btn-common btn-download" onclick="downloadExcel()">
+             Download Excel
+        </button>
+    </div>
+
+    <div class="assessor-listening-charts">
+        <p class="assessor-listening-placeholder">
+            Please select a month to view assessor listening data.
+        </p>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let currentCharts = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const initialModel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model));
+            const assessors = initialModel.assessors || initialModel.Assessors;
+
+            const monthPicker = document.querySelector(".page-input");
+            const now = new Date();
+            monthPicker.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+            if (assessors && assessors.length > 0) renderCharts(initialModel);
+
+            document.querySelector(".btn-search").addEventListener("click", () => {
+                const monthValue = monthPicker.value;
+                if (!monthValue) return alert("Please select a month first.");
+                const [year, month] = monthValue.split("-");
+                const startDate = `${year}-${month}-01`;
+                loadAssessorData(startDate);
+            });
+        });
+
+        function loadAssessorData(startDate) {
+            fetch(`/Manager/GetAssessorListeningTimeData?startDate=${startDate}`)
+                .then(r => r.json())
+                .then(model => renderCharts(model))
+                .catch(err => console.error("Error fetching data:", err));
+        }
+
+        function renderCharts(model) {
+            const container = document.querySelector(".assessor-listening-charts");
+            container.innerHTML = "";
+            currentCharts.forEach(ch => ch.destroy());
+            currentCharts = [];
+
+            const assessors = model.assessors || model.Assessors;
+            if (!assessors || assessors.length === 0) {
+                container.innerHTML = `<p class="assessor-listening-placeholder">No data found for ${model.selectedMonth || model.SelectedMonth}.</p>`;
+                return;
+            }
+
+            assessors.forEach(a => {
+                const chartId = `chart-${(a.assessorName || a.AssessorName).replaceAll(" ", "-")}`;
+                const card = document.createElement("div");
+                card.className = "page-card";
+                card.innerHTML = `
+                    <div class="page-card-header">${a.assessorName || a.AssessorName}</div>
+                    <div class="page-card-body">
+                        <canvas id="${chartId}"></canvas>
+                    </div>
+                `;
+                container.appendChild(card);
+
+                const ctx = document.getElementById(chartId).getContext("2d");
+                const departments = a.departments || a.Departments;
+
+                const datasets = departments.map(dep => ({
+                    label: dep.departmentName || dep.DepartmentName,
+                    data: dep.hoursListened || dep.HoursListened,
+                    backgroundColor: dep.color || dep.Color,
+                    borderRadius: 4
+                }));
+
+                const chart = new Chart(ctx, {
+                    type: "bar",
+                    data: { labels: a.days || a.Days, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: "bottom", labels: { usePointStyle: true } },
+                            tooltip: { mode: "index", intersect: false },
+                            title: { display: true, text: "Listening Time by Department" }
+                        },
+                        scales: {
+                            x: { grid: { color: "#eee" }, title: { display: true, text: "Day" } },
+                            y: { beginAtZero: true, grid: { color: "#eee" }, title: { display: true, text: "Minutes Listened" } }
+                        }
+                    }
+                });
+
+                currentCharts.push(chart);
+            });
+        }
+
+        function downloadExcel() {
+            const selectedMonth = document.querySelector(".page-input").value;
+            if (!selectedMonth) return alert("Please select a month first");
+            const startDate = `${selectedMonth}-01`;
+            window.location.href = `/Manager/DownloadAssessorListeningTimeExcel?startDate=${startDate}`;
+        }
+    </script>
+}

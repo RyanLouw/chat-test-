@@ -1,0 +1,437 @@
+﻿
+@using System.Text.Json
+@using CallQuality.Core.Manager.ReportManager.Models
+@model QuestionWrongStat_ReportVM
+@{
+    ViewData["Title"] = "Question Wrong Stats Report";
+
+    var chartData = Model.Comparison.Select(x => new
+    {
+        q = x.QuestionID,
+        typeName = x.TypeName ?? "",
+        questionValue = x.QuestionValue ?? "",
+        chartLabel = "",
+        thisWrongPct = x.ThisWrongPct,
+        lastWrongPct = x.LastWrongPct,
+        thisTotalWrong = x.ThisTotalWrong,
+        lastTotalWrong = x.LastTotalWrong,
+        thisTotalAnswered = x.ThisTotalAnswered,
+        lastTotalAnswered = x.LastTotalAnswered,
+        delta = x.DeltaWrongPct
+    }).ToList();
+
+    var chartDataJson = JsonSerializer.Serialize(chartData);
+}
+
+
+
+
+<div class="container-fluid py-3">
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h4 class="mb-0">Question Wrong Stats</h4>
+    </div>
+
+    <ul class="nav nav-tabs" id="wrongStatsTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active"
+                    data-bs-toggle="tab"
+                    data-bs-target="#this"
+                    type="button">
+                This month
+            </button>
+        </li>
+
+        <li class="nav-item">
+            <button class="nav-link"
+                    data-bs-toggle="tab"
+                    data-bs-target="#compare"
+                    type="button">
+                Compare vs last month
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white">
+
+        <!-- TAB 1 -->
+        <div class="tab-pane fade show active" id="this">
+
+            <form method="get"
+                  class="row g-2 align-items-end mb-3 js-loader-form"
+                  data-loader-text="Loading question wrong stats...">
+
+                <div class="col-12 col-md-4 col-lg-3">
+                    <label class="form-label small text-muted mb-1">
+                        Assessment Type / Department
+                    </label>
+
+                    <select name="type" class="form-select form-select-sm">
+                        <option value="">All types</option>
+
+                        @foreach (var type in Model.TypeNames)
+                        {
+                            var selected = string.Equals(
+                            Model.SelectedTypeName,
+                            type,
+                            StringComparison.OrdinalIgnoreCase);
+
+                            <option value="@type" selected="@selected">
+                                @type
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-primary" type="submit">
+                        Apply
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.SelectedTypeName))
+                {
+                    <div class="col-auto">
+                        <a class="btn btn-sm btn-outline-secondary js-show-loader"
+                           href="@Url.Action(null, null, new { type = "" })"
+                           data-loader-text="Clearing question wrong stats filter...">
+                            Clear
+                        </a>
+                    </div>
+                }
+            </form>
+
+            @if (Model.ThisMonth == null || !Model.ThisMonth.Any())
+            {
+                <div class="alert alert-info mb-0">
+                    No data for this month.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 160px;">Type</th>
+                                <th class="question-col">Question</th>
+                                <th class="text-end" style="width: 110px;">Answered</th>
+                                <th class="text-end" style="width: 95px;">Correct</th>
+                                <th class="text-end" style="width: 95px;">Correct %</th>
+                                <th class="text-end" style="width: 95px;">Wrong</th>
+                                <th class="text-end" style="width: 95px;">Wrong %</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var r in Model.ThisMonth)
+                            {
+                                <tr>
+                                    <td>@r.TypeName</td>
+
+                                    <td class="question-col">
+                                        <span class="truncate-1" title="@r.QuestionValue">
+                                            @r.QuestionValue
+                                        </span>
+                                    </td>
+
+                                    <td class="text-end">@r.TotalAnswered</td>
+                                    <td class="text-end">@r.TotalCorrect</td>
+                                    <td class="text-end">@r.CorrectPct.ToString("0.00")%</td>
+                                    <td class="text-end">@r.TotalWrong</td>
+                                    <td class="text-end">@r.WrongPct.ToString("0.00")%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="text-muted small">
+                    Sorted by: WrongPct DESC → TotalAnswered DESC → TotalWrong DESC
+                </div>
+            }
+        </div>
+
+        <!-- TAB 2 -->
+        <div class="tab-pane fade" id="compare">
+
+            <div class="mb-3">
+                <label class="form-label small text-muted mb-1">
+                    Search question
+                </label>
+
+                <input id="questionSearch"
+                       class="form-control form-control-sm"
+                       placeholder="Search by question, question ID, or type..." />
+            </div>
+
+            @if (Model.Comparison == null || !Model.Comparison.Any())
+            {
+                <div class="alert alert-info mb-0">
+                    No comparison data available.
+                </div>
+            }
+            else
+            {
+                <div class="row g-3">
+
+                    <!-- CHART FULL WIDTH -->
+                    <div class="col-12">
+                        <div class="border rounded p-3">
+                            <div class="fw-semibold mb-2">
+                                Wrong %: This month vs Last month
+                            </div>
+
+                            <div class="chart-box">
+                                <canvas id="wrongPctChart"></canvas>
+                            </div>
+
+                            <div class="text-muted small mt-2">
+                                Hover over a bar to see the full question and exact values.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TABLE FULL WIDTH -->
+                    <div class="col-12">
+                        <div class="border rounded p-3">
+                            <div class="fw-semibold mb-2">
+                                Question improvement
+                            </div>
+
+                            <div class="table-responsive compare-table-wrapper">
+                                <table class="table table-sm table-striped align-middle mb-0 compare-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="compare-question-col">Question</th>
+                                            <th class="text-end number-col">Last Answered</th>
+                                            <th class="text-end number-col">This Answered</th>
+                                            <th class="text-end number-col">Last Wrong</th>
+                                            <th class="text-end number-col">This Wrong</th>
+                                            <th class="text-end number-col">Last Wrong%</th>
+                                            <th class="text-end number-col">This Wrong%</th>
+                                            <th class="text-end number-col">Δ Wrong%</th>
+                                            <th class="status-col">Status</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        @foreach (var c in Model.Comparison)
+                                        {
+                                            var delta = c.DeltaWrongPct;
+
+                                            var status = delta > 0 ? "Worse" :
+                                            delta < 0 ? "Better" :
+                                                                                      "Same";
+
+                                            <tr class="comparison-row"
+                                                data-question="@((c.QuestionValue ?? "").ToLower())"
+                                                data-question-id="@c.QuestionID"
+                                                data-type-name="@((c.TypeName ?? "").ToLower())">
+
+                                                <td class="compare-question-col">
+                                                    <div class="compare-question-text" title="@c.QuestionValue">
+                                                        @c.QuestionValue
+                                                    </div>
+                                                </td>
+
+                                                <td class="text-end number-col">
+                                                    @c.LastTotalAnswered
+                                                </td>
+
+                                                <td class="text-end number-col">
+                                                    @c.ThisTotalAnswered
+                                                </td>
+
+                                                <td class="text-end number-col">
+                                                    @c.LastTotalWrong
+                                                </td>
+
+                                                <td class="text-end number-col">
+                                                    @c.ThisTotalWrong
+                                                </td>
+
+                                                <td class="text-end number-col">
+                                                    @c.LastWrongPct.ToString("0.00")%
+                                                </td>
+
+                                                <td class="text-end number-col">
+                                                    @c.ThisWrongPct.ToString("0.00")%
+                                                </td>
+
+                                                <td class="text-end number-col">
+                                                    @delta.ToString("0.00")%
+                                                </td>
+
+                                                <td class="status-col">
+                                                    <span class="badge @(status == "Worse" ? "bg-danger" :
+                                                                                                                                    status == "Better" ? "bg-success" :
+                                                                                                                                    "bg-secondary")">
+                                                        @status
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="text-muted small mt-2">
+                                Negative delta means improvement. Positive delta means worse.
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            }
+        </div>
+
+    </div>
+</div>
+
+@section Scripts {
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        (function () {
+            const allData = @Html.Raw(chartDataJson);
+
+            if (!allData || allData.length === 0) {
+                return;
+            }
+
+            let wrongPctChart = null;
+
+            const canvas = document.getElementById('wrongPctChart');
+            const searchInput = document.getElementById('questionSearch');
+
+            if (!canvas) {
+                return;
+            }
+
+            function buildChart(data) {
+                const labels = data.map(() => "");
+                const thisMonth = data.map(x => Number(x.thisWrongPct || 0));
+                const lastMonth = data.map(x => Number(x.lastWrongPct || 0));
+
+                if (wrongPctChart) {
+                    wrongPctChart.destroy();
+                }
+
+                wrongPctChart = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Last month (Wrong %)',
+                                data: lastMonth
+                            },
+                            {
+                                label: 'This month (Wrong %)',
+                                data: thisMonth
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    callback: function (value) {
+                                        return value + '%';
+                                    }
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    display: false
+                                },
+                                grid: {
+                                    display: false
+                                },
+                                border: {
+                                    display: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    title: function (items) {
+                                        const idx = items[0].dataIndex;
+                                        const row = data[idx];
+
+                                        return row.questionValue || 'Question';
+                                    },
+                                    afterTitle: function (items) {
+                                        const idx = items[0].dataIndex;
+                                        const row = data[idx];
+
+                                        if (!row.typeName) {
+                                            return '';
+                                        }
+
+                                        return 'Type: ' + row.typeName;
+                                    },
+                                    label: function (ctx) {
+                                        return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(2) + '%';
+                                    },
+                                    afterBody: function (items) {
+                                        const idx = items[0].dataIndex;
+                                        const row = data[idx];
+
+                                        return [
+                                            'This month answered: ' + row.thisTotalAnswered,
+                                            'Last month answered: ' + row.lastTotalAnswered,
+                                            'This month wrong: ' + row.thisTotalWrong,
+                                            'Last month wrong: ' + row.lastTotalWrong,
+                                            'Delta: ' + Number(row.delta || 0).toFixed(2) + '%'
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function filterCompare() {
+                const search = (searchInput?.value || '').toLowerCase().trim();
+
+                const filteredData = allData.filter(row => {
+                    const question = (row.questionValue || '').toLowerCase();
+                    const questionId = String(row.q || '');
+                    const typeName = (row.typeName || '').toLowerCase();
+
+                    return question.includes(search)
+                        || questionId.includes(search)
+                        || typeName.includes(search);
+                });
+
+                document.querySelectorAll('.comparison-row').forEach(row => {
+                    const question = row.dataset.question || '';
+                    const questionId = row.dataset.questionId || '';
+                    const typeName = row.dataset.typeName || '';
+
+                    const visible =
+                        question.includes(search) ||
+                        questionId.includes(search) ||
+                        typeName.includes(search);
+
+                    row.style.display = visible ? '' : 'none';
+                });
+
+                buildChart(filteredData);
+            }
+
+            buildChart(allData);
+
+            searchInput?.addEventListener('input', filterCompare);
+        })();
+    </script>
+}

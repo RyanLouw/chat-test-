@@ -1,0 +1,200 @@
+﻿@using CallQuality.Core.Manager.ReportManager.Models
+@model List<AssessorBreakdownPercentageDTO>
+
+@{
+    ViewData["Title"] = "Report Assessor Breakdown";
+}
+
+<div class="container-fluid mt-4 assessor-breakdown-page">
+
+    <div class="assessor-breakdown-controls-wrapper">
+
+        <div class="page-controls">
+            <label class="assessor-breakdown-label">From:</label>
+            <input type="date" id="fromDate" class="page-input" />
+
+            <label class="assessor-breakdown-label">To:</label>
+            <input type="date" id="toDate" class="page-input" />
+
+            <button id="btnRetrieve" class="btn-common btn-search">
+                 Retrieve
+            </button>
+
+            <button id="btnExportAll" class="btn-common btn-download">
+                 Export All Excel
+            </button>
+        </div>
+
+
+        <div class="table-actions d-flex justify-content-end mb-3">
+            <input type="text"
+                   id="searchAssessor"
+                   class="form-control assessor-breakdown-search"
+                   placeholder="  Search Assessor..."
+                   style="max-width: 350px; border-radius: 6px;">
+        </div>
+    </div>
+    
+   
+
+
+    <div id="assessorBreakdownContainer" class="assessor-breakdown-container">
+        @if (Model == null || !Model.Any())
+        {
+            <p class="text-center text-muted fs-5 fw-light">No data available for the default period.</p>
+        }
+        else
+        {
+            @foreach (var assessor in Model)
+            {
+                <div class="assessor-breakdown-wrapper">
+                    <div class="assessor-breakdown-header">
+                        <h4>@assessor.AssessorName</h4>
+                    </div>
+
+                    @if (assessor.Results != null && assessor.Results.Any())
+                    {
+                        <div class="assessor-breakdown-content">
+                            <table class="assessor-breakdown-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Dischem PRP</th>
+                                        <th>Dischem SRS</th>
+                                        <th>PRP</th>
+                                        <th>PSP</th>
+                                        <th>CRM</th>
+                                        
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var r in assessor.Results)
+                                    {
+                                        <tr>
+                                            <td>@r.Date?.ToString("yyyy-MM-dd")</td>
+                                            <td>@r.DischemPRP</td>
+                                            <td>@r.DischemSRS</td>
+                                            <td>@r.PRP</td>
+                                            <td>@r.PSP</td>
+                                            <td>@r.CRM</td>
+                                          
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="no-data">No data available.</p>
+                    }
+                </div>
+            }
+
+
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const fromInput = document.getElementById("fromDate");
+            const toInput = document.getElementById("toDate");
+            const today = new Date();
+            const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+            const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            const formatDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            fromInput.value = formatDate(firstDay);
+            toInput.value = formatDate(lastDay);
+        });
+
+
+        document.addEventListener("input", (e) => {
+            if (e.target.id === "searchAssessor") {
+                const searchValue = e.target.value.toLowerCase();
+                const cards = document.querySelectorAll(".assessor-breakdown-wrapper");
+
+                cards.forEach(card => {
+                    const name = card.querySelector(".assessor-breakdown-header").textContent.toLowerCase();
+                    card.style.display = name.includes(searchValue) ? "" : "none";
+                });
+            }
+        });
+
+        document.getElementById("btnRetrieve").addEventListener("click", async () => {
+            const from = document.getElementById("fromDate").value;
+            const to = document.getElementById("toDate").value;
+            const container = document.getElementById("assessorBreakdownContainer");
+
+            container.innerHTML = `<p class="text-center text-muted">Loading...</p>`;
+
+            const response = await fetch(`/Manager/GetAssessorBreakdownReport?from=${from}&to=${to}`);
+            const data = await response.json();
+
+            if (!data || data.length === 0) {
+                container.innerHTML = `<p class="text-center text-muted fs-5">No records found for the selected range.</p>`;
+                return;
+            }
+
+            container.innerHTML = "";
+
+            data.forEach(assessor => {
+                const section = document.createElement("div");
+                section.classList.add("assessor-breakdown-wrapper", "mb-5");
+                section.innerHTML = `
+                    <div class="assessor-breakdown-header text-center text-white py-3">
+                        <h4 class="m-0 fw-semibold">${assessor.assessorName}</h4>
+                    </div>
+                    <div class="assessor-breakdown-table">
+                        ${buildTable(assessor.results)}
+                    </div>
+                `;
+                container.appendChild(section);
+            });
+        });
+
+        document.getElementById("btnExportAll").addEventListener("click", () => {
+            const from = document.getElementById("fromDate").value;
+            const to = document.getElementById("toDate").value;
+            window.location.href = `/Manager/DownloadAssessorBreakdownReportExcel?from=${from}&to=${to}`;
+        });
+
+        function buildTable(rows) {
+            if (!rows || rows.length === 0) {
+                return `<p class="text-muted text-center">No data available.</p>`;
+            }
+
+            // Explicit column → display name mapping
+            const columns = [
+                { key: "date", label: "Date" },
+                { key: "dischemPRP", label: "Dischem PRP" },
+                { key: "dischemSRS", label: "Dischem SRS" },
+                { key: "prp", label: "PRP" },
+                { key: "psp", label: "PSP" },
+               
+            ];
+
+            let html = `
+                <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            ${columns.map(c => `<th>${c.label}</th>`).join("")}
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            rows.forEach(r => {
+                html += `<tr>
+                    ${columns.map(c => `<td>${r[c.key] ?? "-"}</td>`).join("")}
+                </tr>`;
+            });
+
+            html += "</tbody></table></div>";
+            return html;
+        }
+
+    </script>
+}

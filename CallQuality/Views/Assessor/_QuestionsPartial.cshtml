@@ -1,0 +1,52 @@
+﻿<div class="questions-section mb-4">
+
+    <!-- SECTION HEADER -->
+    <div class="section-title mb-3">
+        Assessment Questions
+    </div>
+
+    <!-- QUESTIONS CONTAINER -->
+    <form id="questionsForm" class="questions-list">
+
+        @foreach (var q in Model.SelectedQuestions)
+        {
+            <div class="question-item shadow-sm">
+
+                <!-- QUESTION TEXT -->
+                <div class="question-text">
+                    @q.QuestionValue
+                </div>
+
+                <!-- ANSWER OPTIONS -->
+                <div class="question-options">
+
+                    <label class="option-button">
+                        <input type="radio" name="Answers[@q.QuestionId]" value="yes">
+                        <span>Yes</span>
+                    </label>
+
+                    <label class="option-button">
+                        <input type="radio" name="Answers[@q.QuestionId]" value="no">
+                        <span>No</span>
+                    </label>
+
+                    <label class="option-button">
+                        <input type="radio" name="Answers[@q.QuestionId]" value="na">
+                        <span>N/A</span>
+                    </label>
+                </div>
+
+            </div>
+        }
+
+        <!-- CALCULATE BUTTON -->
+        <button id="btnCalculate"
+                type="button"
+                class="btn-common btn-search"
+                data-loader-text="Calculating score...">
+            Calculate Score
+        </button>
+
+    </form>
+
+</div>

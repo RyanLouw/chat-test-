@@ -1,0 +1,736 @@
+﻿@using CallQuality.Core.Manager.ReportManager.Models
+@model List<AssessorAccuracyReportViewModel>
+
+@{
+    ViewData["Title"] = "Assessment Accuracy";
+}
+
+<div class="assessment-accuracy-page">
+    <div class="page-controls">
+        <label class="assessment-accuracy-label">Select Month:</label>
+        <input type="month" class="page-input" />
+
+        <label class="assessment-accuracy-label">Role:</label>
+        <select class="assessment-accuracy-role-dropdown">
+            <option value="Assessor" selected>Assessor</option>
+            <option value="Reassessor">Reassessor</option>
+        </select>
+
+        <button class="btn-common btn-search">
+            Search
+        </button>
+
+        <button class="btn-common btn-download" onclick="downloadAccuracyExcel()">
+            Download Excel
+        </button>
+    </div>
+
+    <div class="assessment-accuracy-charts">
+        <p class="assessment-accuracy-placeholder">
+            Please select a month to view assessor accuracy data.
+        </p>
+    </div>
+</div>
+
+
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        let currentCharts = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const initialModel =
+                @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model));
+
+            const assessors = initialModel || [];
+
+
+            const monthPicker =
+                document.querySelector(".page-input");
+
+            const roleDropdown =
+                document.querySelector(".assessment-accuracy-role-dropdown");
+
+            const searchButton =
+                document.querySelector(".btn-search");
+
+            const now = new Date();
+
+            monthPicker.value =
+                `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+            if (assessors.length > 0) {
+                renderCharts(assessors, roleDropdown.value);
+            }
+
+            searchButton.addEventListener("click", () => {
+                if (!monthPicker.value) {
+                    alert("Please select a month.");
+                    return;
+                }
+
+                const [year, month] =
+                    monthPicker.value.split("-");
+
+                const startDate =
+                    `${year}-${month}-01`;
+
+                const role =
+                    roleDropdown.value;
+
+                loadAccuracyData(startDate, role);
+            });
+        });
+
+        async function loadAccuracyData(startDate, role) {
+            AppLoader.show("Loading accuracy report...");
+
+            const requestLabel =
+                `[Accuracy API Request] ${role} - ${startDate}`;
+
+
+
+            try {
+                const url =
+                    `/Manager/GetAccuracyReportData` +
+                    `?startDate=${encodeURIComponent(startDate)}` +
+                    `&role=${encodeURIComponent(role)}`;
+
+
+
+                const response = await fetch(url);
+
+
+
+                const text = await response.text();
+
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        `HTTP ${response.status}: ${text}`
+                    );
+                }
+
+                const model =
+                    text ? JSON.parse(text) : [];
+
+
+
+                renderCharts(model, role);
+            }
+            catch (error) {
+                
+
+                alert(
+                    "An error occurred while loading the accuracy report."
+                );
+            }
+            finally {
+
+                AppLoader.hide();
+            }
+        }
+
+        function parseScore(value) {
+            if (
+                value === null ||
+                value === undefined ||
+                value === ""
+            ) {
+                return null;
+            }
+
+            const cleanedValue =
+                String(value)
+                    .replace("%", "")
+                    .replace(",", ".")
+                    .trim();
+
+            const parsedValue =
+                Number(cleanedValue);
+
+            return Number.isFinite(parsedValue)
+                ? parsedValue
+                : null;
+        }
+
+        function calculateAssessorMetrics(scores, assessorName) {
+            const safeScores =
+                Array.isArray(scores)
+                    ? scores
+                    : [];
+
+
+
+            const scoreDetails =
+                safeScores.map((score, index) => {
+                    const assessmentId =
+                        score.assessmentId ??
+                        score.AssessmentId ??
+                        score.AssessmentID ??
+                        `Assessment ${index + 1}`;
+
+                    const rawAssessmentScore =
+                        score.assessmentScore ??
+                        score.AssessmentScore;
+
+                    const rawReassessmentScore =
+                        score.reassessmentScore ??
+                        score.ReassessmentScore;
+
+                    const assessmentScore =
+                        parseScore(rawAssessmentScore);
+
+                    const reassessmentScore =
+                        parseScore(rawReassessmentScore);
+
+                    const hasAssessmentScore =
+                        assessmentScore !== null;
+
+                    const hasReassessmentScore =
+                        reassessmentScore !== null;
+
+                    const hasBothScores =
+                        hasAssessmentScore &&
+                        hasReassessmentScore;
+
+                    /*
+                     * Signed difference:
+                     *
+                     * Assessment - Reassessment
+                     *
+                     * This value is logged only. The final
+                     * percentage is calculated from the totals.
+                     */
+                    const signedDifference =
+                        hasBothScores
+                            ? assessmentScore -
+                              reassessmentScore
+                            : null;
+
+                    /*
+                     * Absolute difference is retained for logging
+                     * and for the existing differences array.
+                     *
+                     * It is not used in the final formula.
+                     */
+                    const absoluteDifference =
+                        signedDifference !== null
+                            ? Math.abs(signedDifference)
+                            : null;
+
+                    const individualDifferenceRatio =
+                        hasBothScores &&
+                        assessmentScore !== 0
+                            ? signedDifference /
+                              assessmentScore
+                            : null;
+
+                    const individualDifferencePercentage =
+                        individualDifferenceRatio !== null
+                            ? individualDifferenceRatio * 100
+                            : null;
+
+                    const individualAssessmentToReassessmentPercentage =
+                        individualDifferencePercentage !== null
+                            ? 100 -
+                              individualDifferencePercentage
+                            : null;
+
+                    return {
+                        index: index + 1,
+                        assessmentId,
+
+                        rawAssessmentScore,
+                        rawReassessmentScore,
+
+                        assessmentScore,
+                        reassessmentScore,
+
+                        hasAssessmentScore,
+                        hasReassessmentScore,
+                        hasBothScores,
+
+                        signedDifference,
+                        absoluteDifference,
+
+                        /*
+                         * Preserve this property because the existing
+                         * chart code still reads score.difference.
+                         */
+                        difference: absoluteDifference,
+
+                        individualDifferenceRatio,
+                        individualDifferencePercentage,
+                        individualAssessmentToReassessmentPercentage
+                    };
+                });
+
+
+            /*
+             * Only rows containing both scores are included.
+             * A zero score is still a valid score.
+             */
+            const pairedScores =
+                scoreDetails.filter(
+                    score => score.hasBothScores
+                );
+
+            const excludedScores =
+                scoreDetails.filter(
+                    score => !score.hasBothScores
+                );
+
+            const pairedCount = pairedScores.length;
+
+            /*
+             * STEP 1:
+             * Add all assessment scores.
+             */
+            const assessmentTotal =
+                pairedScores.reduce(
+                    (total, score) =>
+                        total + score.assessmentScore,
+                    0
+                );
+
+            /*
+             * STEP 2:
+             * Add all reassessment scores.
+             */
+            const reassessmentTotal =
+                pairedScores.reduce(
+                    (total, score) =>
+                        total + score.reassessmentScore,
+                    0
+                );
+
+            /*
+             * These averages are informational only.
+             * They are not used in the final formula.
+             */
+            const averageAssessment =
+                pairedCount > 0
+                    ? assessmentTotal / pairedCount
+                    : 0;
+
+            const averageReassessment =
+                pairedCount > 0
+                    ? reassessmentTotal / pairedCount
+                    : 0;
+
+
+        /*
+         * STEP 3:
+         * Get the absolute difference between the totals.
+         */
+        const totalScoreDifference =
+            Math.abs(
+                assessmentTotal -
+                reassessmentTotal
+            );
+
+        const absoluteDifferenceTotal =
+            pairedScores.reduce(
+                (total, score) =>
+                    total + score.absoluteDifference,
+                0
+            );
+
+        /*
+         * STEP 4:
+         * Difference / Assessment total
+         */
+        const differenceRatio =
+            pairedCount > 0 &&
+            assessmentTotal !== 0
+                ? totalScoreDifference /
+                  assessmentTotal
+                : null;
+
+        /*
+         * STEP 5:
+         * Convert the difference to a percentage.
+         */
+        const differencePercentage =
+            differenceRatio !== null
+                ? differenceRatio * 100
+                : null;
+
+        /*
+         * STEP 6:
+         * Accuracy cannot be lower than 0%
+         * or higher than 100%.
+         */
+        const assessmentToReassessmentPercentage =
+            differencePercentage !== null
+                ? Math.max(
+                    0,
+                    Math.min(
+                        100,
+                        100 - differencePercentage
+                    )
+                )
+                : null;
+
+        /*
+         * Validation formula.
+         */
+        const simplifiedPercentage =
+            pairedCount > 0 &&
+            assessmentTotal !== 0
+                ? Math.max(
+                    0,
+                    Math.min(
+                        100,
+                        100 -
+                        (
+                            Math.abs(
+                                assessmentTotal -
+                                reassessmentTotal
+                            ) /
+                            assessmentTotal
+                        ) * 100
+                    )
+                )
+                : null;
+
+
+
+            const validationDifference =
+                assessmentToReassessmentPercentage !== null &&
+                simplifiedPercentage !== null
+                    ? Math.abs(
+                        assessmentToReassessmentPercentage -
+                        simplifiedPercentage
+                      )
+                    : null;
+
+
+
+
+            const returnedMetrics = {
+                scoreDetails,
+                pairedScores,
+                excludedScores,
+                pairedCount,
+
+                assessmentTotal,
+                reassessmentTotal,
+
+                averageAssessment,
+                averageReassessment,
+
+                totalScoreDifference,
+                absoluteDifferenceTotal,
+
+                differenceRatio,
+                differencePercentage,
+
+                assessmentToReassessmentPercentage,
+                simplifiedPercentage,
+                validationDifference
+            };
+
+
+
+
+            return returnedMetrics;
+        }
+
+        function renderCharts(model, role) {
+            const container =
+                document.querySelector(
+                    ".assessment-accuracy-charts"
+                );
+
+            container.innerHTML = "";
+
+            currentCharts.forEach(
+                chart => chart.destroy()
+            );
+
+            currentCharts = [];
+
+            if (
+                !Array.isArray(model) ||
+                model.length === 0
+            ) {
+                container.innerHTML = `
+                    <p class="assessment-accuracy-placeholder">
+                        No data found for this selection.
+                    </p>
+                `;
+
+                return;
+            }
+
+            model.forEach((assessor, assessorIndex) => {
+                const assessorName =
+                    assessor.assessorName ??
+                    assessor.AssessorName ??
+                    "Unknown";
+
+                const scores =
+                    assessor.scores ??
+                    assessor.Scores ??
+                    [];
+
+                const safeChartId =
+                    assessorName
+                        .replaceAll(" ", "-")
+                        .replace(
+                            /[^a-zA-Z0-9-_]/g,
+                            ""
+                        );
+
+  
+                const chartId =
+                    `chart-${safeChartId}-${assessorIndex}`;
+
+                const card =
+                    document.createElement("div");
+
+                card.className = "page-card";
+
+                card.innerHTML = `
+                    <div class="page-card-header">
+                        ${assessorName}
+                    </div>
+
+                    <div class="page-card-body">
+                        <canvas id="${chartId}"></canvas>
+
+                        <div
+                            id="label-${chartId}"
+                            class="assessment-accuracy-summary">
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+
+                const metrics =
+                    calculateAssessorMetrics(
+                        scores,
+                        assessorName
+                    );
+
+                const labels =
+                    metrics.scoreDetails.map(
+                        score => score.assessmentId
+                    );
+
+                const assessmentScores =
+                    metrics.scoreDetails.map(
+                        score => score.assessmentScore
+                    );
+
+                const reassessmentScores =
+                    metrics.scoreDetails.map(
+                        score => score.reassessmentScore
+                    );
+
+                const differences =
+                    metrics.scoreDetails.map(
+                        score => score.difference
+                    );
+
+                const summaryDiv =
+                    document.getElementById(
+                        `label-${chartId}`
+                    );
+
+                if (metrics.pairedCount === 0) {
+                    summaryDiv.innerText =
+                        "No completed assessment and reassessment pairs found.";
+                }
+                else if (
+                    metrics.assessmentToReassessmentPercentage === null
+                ) {
+                    summaryDiv.innerText =
+                        "Unable to calculate accuracy because the assessment total is zero.";
+                }
+                else {
+                    summaryDiv.innerText =
+                        `Accuracy: ` +
+                        `${metrics.assessmentToReassessmentPercentage.toFixed(1)}%`;
+                }
+
+                const datasets = [
+                    {
+                        label:
+                            "Assessment Score (%)",
+
+                        data:
+                            assessmentScores,
+
+                        backgroundColor:
+                            "#3498db",
+
+                        borderColor:
+                            "#2c80b4",
+
+                        borderWidth: 1
+                    },
+                    {
+                        label:
+                            "Reassessment Score (%)",
+
+                        data:
+                            reassessmentScores,
+
+                        backgroundColor:
+                            "#2ecc71",
+
+                        borderColor:
+                            "#27ae60",
+
+                        borderWidth: 1
+                    },
+
+                ];
+
+                const canvas =
+                    document.getElementById(
+                        chartId
+                    );
+
+                const context =
+                    canvas.getContext("2d");
+
+                const chart =
+                    new Chart(context, {
+                        type: "bar",
+
+                        data: {
+                            labels,
+                            datasets
+                        },
+
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+
+                            plugins: {
+                                legend: {
+                                    position: "bottom"
+                                },
+
+
+
+                                title: {
+                                    display: true,
+                                    text:
+                                        "Assessment vs Reassessment Scores"
+                                }
+                            },
+
+                            scales: {
+                                x: {
+                                    stacked: false,
+
+                                    grid: {
+                                        color: "#eee"
+                                    },
+
+                                    title: {
+                                        display: true,
+                                        text: "Assessment #"
+                                    }
+                                },
+
+                                y: {
+                                    stacked: false,
+                                    beginAtZero: true,
+                                    max: 100,
+
+                                    grid: {
+                                        color: "#eee"
+                                    },
+
+                                    title: {
+                                        display: true,
+                                        text: "Score (%)"
+                                    }
+                                }
+                            },
+
+                            onClick: (event, elements) => {
+                                if (!elements.length) {
+                                    return;
+                                }
+
+                                const index =
+                                    elements[0].index;
+
+                                const clickedAssessment =
+                                    scores[index];
+
+
+                                const assessmentId =
+                                    clickedAssessment?.assessmentId ??
+                                    clickedAssessment?.AssessmentId ??
+                                    clickedAssessment?.AssessmentID ??
+                                    null;
+
+
+                                window.open(
+                                    `/Assessor/ViewOperatorAssessment/${assessmentId}`,
+                                    "_blank"
+                                );
+                            }
+                        }
+                    });
+
+                currentCharts.push(chart);
+            });
+        }
+
+        function downloadAccuracyExcel() {
+            const monthValue =
+                document.querySelector(
+                    ".page-input"
+                ).value;
+
+            const role =
+                document.querySelector(
+                    ".assessment-accuracy-role-dropdown"
+                ).value;
+
+            if (!monthValue) {
+                alert(
+                    "Please select a month first."
+                );
+
+                return;
+            }
+
+            const [year, month] =
+                monthValue.split("-");
+
+            const startDate =
+                `${year}-${month}-01`;
+
+            const url =
+                `/Manager/DownloadAccuracyExcel` +
+                `?startDate=${encodeURIComponent(startDate)}` +
+                `&role=${encodeURIComponent(role)}`;
+
+            AppLoader.show(
+                "Preparing Excel download..."
+            );
+
+            window.location.href = url;
+
+            setTimeout(() => {
+                AppLoader.hide();
+            }, 1500);
+        }
+    </script>
+}
+
+

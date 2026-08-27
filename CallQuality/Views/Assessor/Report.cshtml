@@ -1,0 +1,158 @@
+﻿
+@using CallQuality.Core.Manager.ReportManager.Models
+@model List<OperatorNumberOfAssessmentReportDTO>
+
+@{
+    ViewData["Title"] = "Operator Assessments Report";
+
+    DateTime? selectedMonth = null;
+    if (Context.Request.Query.TryGetValue("month", out var m) && DateTime.TryParse(m, out var parsed))
+        selectedMonth = parsed;
+
+    var selectedMonthValue = selectedMonth.HasValue
+        ? selectedMonth.Value.ToString("yyyy-MM")
+        : "";
+}
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h3 class="mb-0">Operator Assessments Report</h3>
+            <div class="text-muted small">Pick a month and load the report.</div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary"
+                    type="button"
+                    onclick="AppLoader.show('Refreshing report...'); location.reload();">
+                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body">
+
+            <form method="get"
+                  asp-controller="Assessor"
+                  asp-action="Report"
+                  class="js-loader-form"
+                  data-loader-text="Loading operator assessments report...">
+
+                <div class="d-flex flex-wrap align-items-end gap-3">
+
+                    <div style="min-width: 220px;">
+                        <label class="form-label fw-semibold">Month</label>
+                        <input type="month" name="month" class="form-control" value="@selectedMonthValue" />
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="bi bi-search me-1"></i>Load
+                        </button>
+
+                        <a class="btn btn-outline-secondary js-show-loader"
+                           asp-controller="Assessor"
+                           asp-action="Report"
+                           data-loader-text="Clearing report filters...">
+                            Clear
+                        </a>
+                    </div>
+
+                    <div class="ms-auto" style="min-width: 280px;">
+                        <label class="form-label fw-semibold">Search</label>
+                        <input type="text"
+                               id="searchInput"
+                               class="form-control"
+                               placeholder="Search operator / dept..." />
+                    </div>
+
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+
+            @if (Model == null || !Model.Any())
+            {
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                    <div class="fw-semibold">No results yet</div>
+                    <div class="small">Choose a month and click <b>Load</b>.</div>
+                </div>
+            }
+            else
+            {
+                var totalAssessments = Model.Sum(x => x.NumberOfAssessment);
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="text-muted small">
+                        Rows: <b id="visibleCount">@Model.Count</b> / @Model.Count
+                    </div>
+                    <div class="text-muted small">
+                        Total Assessments: <b>@totalAssessments</b>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0" id="reportTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Operator</th>
+                                <th>Department</th>
+                                <th class="text-end"># Assessments</th>
+                                <th class="text-end">Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in Model)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@r.Operator</td>
+                                    <td class="text-muted">@r.Department</td>
+                                    <td class="text-end fw-semibold">@r.NumberOfAssessment</td>
+                                    <td class="text-end">
+                                        @(r.Percentage?.ToString("0.##") ?? "0")%
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th colspan="2" class="text-end">Total</th>
+                                <th class="text-end">@totalAssessments</th>
+                                <th></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function updateVisibleCount() {
+            const rows = Array.from(document.querySelectorAll("#reportTable tbody tr"));
+            const visible = rows.filter(r => r.style.display !== "none").length;
+            const el = document.getElementById("visibleCount");
+            if (el) el.textContent = visible;
+        }
+
+        document.getElementById("searchInput")?.addEventListener("input", function () {
+            const value = this.value.toLowerCase();
+            document.querySelectorAll("#reportTable tbody tr").forEach(tr => {
+                tr.style.display = tr.innerText.toLowerCase().includes(value) ? "" : "none";
+            });
+            updateVisibleCount();
+        });
+
+        updateVisibleCount();
+    </script>
+}

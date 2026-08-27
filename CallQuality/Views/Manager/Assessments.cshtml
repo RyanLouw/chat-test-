@@ -1,0 +1,373 @@
+﻿@using CallQuality.Core.Manager.AssessmentsManager.Models
+@using CallQuality.Core.Manager.Models.CallQualityDTOs
+
+@model PagedAssessmentVM
+
+@{
+    ViewData["Title"] = "Over Assessments Overview";
+    var possibleReassessments = Model.NotReassessed;
+    var alreadyReassessed = Model.Reassessment;
+}
+
+<div class="container-fluid mt-4 over-assessment-container">
+
+    <h1 class="display-5 fw-bold mb-4 text-center text-primary">
+        Over Assessments Overview
+    </h1>
+
+    <form method="get"
+          asp-action="Assessments"
+          class="d-flex justify-content-end mb-3 over-assessment-search js-loader-form"
+          data-loader-text="Searching over assessments...">
+
+        <input type="hidden"
+               name="possiblePage"
+               value="1" />
+
+        <input type="hidden"
+               name="reassessedPage"
+               value="1" />
+
+        <input type="hidden"
+               name="pageSize"
+               value="@Model.PageSize" />
+
+        <input type="hidden"
+               id="activeTabInput"
+               name="activeTab"
+               value="@Model.ActiveTab" />
+
+        <input type="text"
+               name="search"
+               value="@Model.SearchTerm"
+               class="form-control"
+               placeholder="Search Pharmacy or Assessor..."
+               style="max-width: 350px; border-radius: 6px; margin-right: 10px;" />
+
+        <button type="submit" class="btn btn-primary">
+            Search
+        </button>
+    </form>
+
+    <ul class="nav nav-tabs mb-3"
+        id="assessmentTabs"
+        role="tablist">
+
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold @(Model.ActiveTab == "possible" ? "active" : "")"
+                    id="possible-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#possible"
+                    type="button"
+                    role="tab"
+                    aria-controls="possible"
+                    aria-selected="@(Model.ActiveTab == "possible" ? "true" : "false")">
+
+                Possible Reassessment
+                (@Model.TotalCountNotReassessment)
+            </button>
+        </li>
+
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold @(Model.ActiveTab == "reassessed" ? "active" : "")"
+                    id="reassessed-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#reassessed"
+                    type="button"
+                    role="tab"
+                    aria-controls="reassessed"
+                    aria-selected="@(Model.ActiveTab == "reassessed" ? "true" : "false")">
+
+                Already Reassessed
+                (@Model.TotalCountReassessment)
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="assessmentTabsContent">
+
+        <!-- Possible reassessments -->
+        <div class="tab-pane fade @(Model.ActiveTab == "possible" ? "show active" : "")"
+             id="possible"
+             role="tabpanel"
+             aria-labelledby="possible-tab">
+
+            @await Html.PartialAsync(
+                "_AssessmentTable",
+                        possibleReassessments)
+
+            @if (Model.PossibleTotalPages > 1)
+                        {
+                        int currentPage = Model.PossibleCurrentPage;
+            int totalPages = Model.PossibleTotalPages;
+
+            int startPage = Math.Max(1, currentPage - 2);
+            int endPage = Math.Min(totalPages, startPage + 4);
+
+            if (endPage - startPage < 4)
+            {
+                startPage = Math.Max(1, endPage - 4);
+            }
+
+            <nav class="d-flex justify-content-center mt-4">
+                <ul class="pagination over-assessment-pagination">
+
+                    @if (currentPage > 1)
+                    {
+                        <li class="page-item">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="1"
+                               asp-route-reassessedPage="@Model.ReassessedCurrentPage"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="possible"
+                               data-loader-text="Loading first page...">
+                                &laquo;
+                            </a>
+                        </li>
+
+                        <li class="page-item">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@(currentPage - 1)"
+                               asp-route-reassessedPage="@Model.ReassessedCurrentPage"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="possible"
+                               data-loader-text="Loading previous page...">
+                                &lsaquo;
+                            </a>
+                        </li>
+                    }
+
+                    @for (int pageNumber = startPage;
+                                        pageNumber <= endPage;
+                                        pageNumber++)
+                    {
+                        <li class="page-item @(pageNumber == currentPage ? "active" : "")">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@pageNumber"
+                               asp-route-reassessedPage="@Model.ReassessedCurrentPage"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="possible"
+                               data-loader-text="Loading possible reassessments...">
+                                @pageNumber
+                            </a>
+                        </li>
+                    }
+
+                    @if (currentPage < totalPages)
+                    {
+                        <li class="page-item">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@(currentPage + 1)"
+                               asp-route-reassessedPage="@Model.ReassessedCurrentPage"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="possible"
+                               data-loader-text="Loading next page...">
+                                &rsaquo;
+                            </a>
+                        </li>
+
+                        <li class="page-item">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@totalPages"
+                               asp-route-reassessedPage="@Model.ReassessedCurrentPage"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="possible"
+                               data-loader-text="Loading last page...">
+                                &raquo;
+                            </a>
+                        </li>
+                    }
+
+                </ul>
+            </nav>
+                        }
+        </div>
+
+        <!-- Already reassessed -->
+        <div class="tab-pane fade @(Model.ActiveTab == "reassessed" ? "show active" : "")"
+             id="reassessed"
+             role="tabpanel"
+             aria-labelledby="reassessed-tab">
+
+            @await Html.PartialAsync(
+                                "_AssessmentTable",
+                        alreadyReassessed)
+
+            @if (Model.ReassessedTotalPages > 1)
+                        {
+                        int currentPage = Model.ReassessedCurrentPage;
+            int totalPages = Model.ReassessedTotalPages;
+
+            int startPage = Math.Max(1, currentPage - 2);
+            int endPage = Math.Min(totalPages, startPage + 4);
+
+            if (endPage - startPage < 4)
+            {
+                startPage = Math.Max(1, endPage - 4);
+            }
+
+            <nav class="d-flex justify-content-center mt-4">
+                <ul class="pagination over-assessment-pagination">
+
+                    @if (currentPage > 1)
+                    {
+                        <li class="page-item">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@Model.PossibleCurrentPage"
+                               asp-route-reassessedPage="1"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="reassessed"
+                               data-loader-text="Loading first page...">
+                                &laquo;
+                            </a>
+                        </li>
+
+                        <li class="page-item">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@Model.PossibleCurrentPage"
+                               asp-route-reassessedPage="@(currentPage - 1)"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="reassessed"
+                               data-loader-text="Loading previous page...">
+                                &lsaquo;
+                            </a>
+                        </li>
+                    }
+
+                    @for (int pageNumber = startPage;
+                                        pageNumber <= endPage;
+                                        pageNumber++)
+                    {
+                        <li class="page-item @(pageNumber == currentPage ? "active" : "")">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@Model.PossibleCurrentPage"
+                               asp-route-reassessedPage="@pageNumber"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="reassessed"
+                               data-loader-text="Loading reassessed assessments...">
+                                @pageNumber
+                            </a>
+                        </li>
+                    }
+
+                    @if (currentPage < totalPages)
+                    {
+                        <li class="page-item">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@Model.PossibleCurrentPage"
+                               asp-route-reassessedPage="@(currentPage + 1)"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="reassessed"
+                               data-loader-text="Loading next page...">
+                                &rsaquo;
+                            </a>
+                        </li>
+
+                        <li class="page-item">
+                            <a class="page-link js-show-loader"
+                               asp-action="Assessments"
+                               asp-route-possiblePage="@Model.PossibleCurrentPage"
+                               asp-route-reassessedPage="@totalPages"
+                               asp-route-pageSize="@Model.PageSize"
+                               asp-route-search="@Model.SearchTerm"
+                               asp-route-activeTab="reassessed"
+                               data-loader-text="Loading last page...">
+                                &raquo;
+                            </a>
+                        </li>
+                    }
+
+                </ul>
+            </nav>
+                        }
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const activeTabInput =
+            document.getElementById("activeTabInput");
+
+        document
+            .querySelectorAll(
+                '#assessmentTabs button[data-bs-toggle="tab"]'
+            )
+            .forEach(tabButton => {
+                tabButton.addEventListener(
+                    "shown.bs.tab",
+                    function (event) {
+                        if (!activeTabInput) {
+                            return;
+                        }
+
+                        activeTabInput.value =
+                            event.target.id === "reassessed-tab"
+                                ? "reassessed"
+                                : "possible";
+                    });
+            });
+    });
+
+    document.addEventListener("click", function (e) {
+        const row = e.target.closest(".over-assessment-row");
+
+        if (!row) {
+            return;
+        }
+        if (e.target.closest("a, button")) {
+            return;
+        }
+
+        const icon = row.querySelector(".toggle-icon");
+        const isOpen = row.classList.contains("active");
+
+        document
+            .querySelectorAll(".over-assessment-row.active")
+            .forEach(openRow => {
+                openRow.classList.remove("active");
+
+                const openIcon =
+                    openRow.querySelector(".toggle-icon");
+
+                if (openIcon) {
+                    openIcon.classList.remove("bi-chevron-up");
+                    openIcon.classList.add("bi-chevron-down");
+                }
+            });
+
+        if (!isOpen) {
+            row.classList.add("active");
+
+            if (icon) {
+                icon.classList.remove("bi-chevron-down");
+                icon.classList.add("bi-chevron-up");
+            }
+        } else {
+            row.classList.remove("active");
+
+            if (icon) {
+                icon.classList.remove("bi-chevron-up");
+                icon.classList.add("bi-chevron-down");
+            }
+        }
+    });
+</script>

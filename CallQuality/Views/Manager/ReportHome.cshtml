@@ -1,0 +1,49 @@
+﻿@{
+    ViewData["Title"] = "Manager Reports";
+}
+
+<div class="container py-5 pt-5 mt-5 d-flex justify-content-center">
+    <div class="row w-100 align-items-center justify-content-center">
+
+        <!-- LEFT COLUMN – Image -->
+        <div class="col-12 col-md-5 d-flex justify-content-center mb-4 mb-md-0">
+            <img src="~/Report.jpg" alt="Reports" class="img-fluid report-page-image">
+        </div>
+
+        <!-- RIGHT COLUMN – Buttons -->
+        <div class="col-12 col-md-5 d-flex justify-content-center">
+            <div class="d-flex flex-column gap-3 w-100" style="max-width: 350px;">
+                <a asp-controller="Manager"
+                   asp-action="Report_AssessorListeningTime"
+                   class="manager-btn w-100">
+                    Assessor Listening Time
+                </a>
+
+                <a asp-controller="Manager"
+                   asp-action="AssessmentAccuracy"
+                   class="manager-btn w-100">
+                    Assessment Accuracy
+                </a>
+
+                <a asp-controller="Manager"
+                   asp-action="Report_AssessorTracking"
+                   class="manager-btn w-100">
+                    Assessor Tracking
+                </a>
+
+                <a asp-controller="Manager"
+                   asp-action="Report_AssessorBreakdown"
+                   class="manager-btn w-100">
+                    Assessor Breakdown
+                </a>
+
+                <a asp-controller="Manager"
+                   asp-action="QuestionWrongStatsReport"
+                   class="manager-btn w-100">
+                    Question Breakdown
+                </a>
+            </div>
+        </div>
+
+    </div>
+</div>

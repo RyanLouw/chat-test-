@@ -1,0 +1,233 @@
+﻿@using CallQuality.Core.Manager.AssessmentsManager.Models
+@model OperatorAssessmentsVM
+@{
+    ViewData["Title"] = "Operator Assessments";
+    var today = DateTime.Today;
+    var firstOfMonth = new DateOnly(today.Year, today.Month, 1);
+    var lastOfMonth = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+}
+
+<div class="container-fluid mt-4 report-assessor-tracking">
+
+
+    <div class="page-controls">
+        <label class="assessor-tracking-label">Department:</label>
+        <select id="departmentSelect" class="page-input">
+            @foreach (var type in Model.AssessmentTypes)
+            {
+                <option value="@type.TypeName">@type.TypeName</option>
+            }
+        </select>
+
+        <label class="assessor-tracking-label">Agent:</label>
+        <select id="agentSelect" class="page-input">
+            @foreach (var user in Model.UsersInDepartments)
+            {
+                <option value="@user.Extension">@user.GivenName @user.Surname (@user.Extension)</option>
+            }
+        </select>
+
+        <label class="assessor-tracking-label">From:</label>
+        <input type="date" id="startDate" class="page-input"
+               value="@firstOfMonth.ToString("yyyy-MM-dd")" />
+
+        <label class="assessor-tracking-label">To:</label>
+        <input type="date" id="endDate" class="page-input"
+               value="@lastOfMonth.ToString("yyyy-MM-dd")" />
+
+        <button id="searchBtn" class="btn-common btn-search">
+             Search
+        </button>
+    </div>
+
+
+    <div class="table-actions d-flex justify-content-end mb-2">
+        <input type="text" id="tableSearch" class="form-control"
+               placeholder="Search Extension, Assessor, or ID..."
+               style="max-width: 350px; border-radius: 6px;">
+    </div>
+
+
+    <div class="table-responsive">
+        <table class="tracking-table" id="operatorTable">
+            <thead>
+                <tr>
+                    <th>Assessment ID</th>
+                    <th>Agent Extension</th>
+                    <th>Assessed By</th>
+                    <th>Assessed On</th>
+                    <th>Assessment Score</th>
+                    <th>Reassessed</th>
+                    <th>Reassessed By</th>
+                    <th>Reassessed On</th>
+                    <th>Reassessment Score</th>
+                </tr>
+            </thead>
+          <tbody>
+    @if (Model.OperatorAssessments != null && Model.OperatorAssessments.Any())
+    {
+        @foreach (var assessmentGroup in Model.OperatorAssessments
+                        .GroupBy(x => x.AssessmentID))
+        {
+            var item = assessmentGroup.First();
+
+            var reassessedRows = assessmentGroup
+                .Where(x => x.ReassessorAnswer.HasValue)
+                .ToList();
+
+            var isReassessed = reassessedRows.Any();
+
+            var reassessedBy = isReassessed
+                ? "Reassessed"
+                : "—";
+
+            var reassessedOn = isReassessed
+                ? assessmentGroup.Max(x => x.AssessedOn)
+                : null;
+
+            int? reassessmentScore = null;
+
+            if (isReassessed)
+            {
+                reassessmentScore = assessmentGroup
+                    .Where(x => x.ReassessorAnswer.HasValue && x.IsNA != true)
+                    .Sum(x => x.Score ?? 0);
+            }
+
+            <tr class="clickable-row"
+                data-href="/Assessor/ViewOperatorAssessment/@item.AssessmentID">
+                <td>@item.AssessmentID</td>
+                <td>@item.Extension</td>
+                <td>@item.AssessedBy</td>
+                <td>@item.AssessedOn?.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>@(item.Assessment_Score?.ToString() ?? "—")</td>
+                <td>@(isReassessed ? "✅ Yes" : "❌ No")</td>
+                <td>@reassessedBy</td>
+                <td>@(reassessedOn?.ToString("yyyy-MM-dd") ?? "—")</td>
+                <td>@(reassessmentScore?.ToString() ?? "—")</td>
+            </tr>
+        }
+    }
+    else
+    {
+        <tr>
+            <td colspan="9" class="text-muted text-center py-4">
+                No assessments available. Select filters and click <strong>Search</strong>.
+            </td>
+        </tr>
+    }
+</tbody>
+        </table>
+    </div>
+
+
+    <div id="loadingSpinner" class="text-center mt-4" style="display:none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+</div>
+@section Scripts {
+    <script>
+
+        function initAgentSelect2() {
+            $('#agentSelect').select2({
+                placeholder: "Search or select an agent...",
+                allowClear: true,
+                width: 'resolve',
+                dropdownAutoWidth: true,
+                minimumResultsForSearch: 0
+            });
+        }
+
+
+        $(document).ready(function () {
+            initAgentSelect2();
+            applyTableFeatures();
+        });
+
+
+        async function reloadAssessments() {
+            const department = $('#departmentSelect').val();
+            const ext = $('#agentSelect').val();
+            const start = $('#startDate').val();
+            const end = $('#endDate').val();
+
+            const spinner = document.getElementById('loadingSpinner');
+            spinner.style.display = 'block';
+
+            try {
+                const params = new URLSearchParams({ department, ext, start, end });
+                const response = await fetch(`/Assessor/OperatorAssessment?${params.toString()}`);
+                const html = await response.text();
+
+                const parser = new DOMParser();
+                const newDoc = parser.parseFromString(html, "text/html");
+                const newTable = newDoc.getElementById("operatorTable");
+                document.getElementById("operatorTable").innerHTML = newTable.innerHTML;
+
+                applyTableFeatures();
+            } catch (err) {
+
+            } finally {
+                spinner.style.display = 'none';
+            }
+        }
+
+        async function reloadDepartmentOnly() {
+            const department = $('#departmentSelect').val();
+            const spinner = document.getElementById('loadingSpinner');
+            spinner.style.display = 'block';
+
+            try {
+                const params = new URLSearchParams({ department });
+                const response = await fetch(`/Assessor/OperatorAssessment?${params.toString()}`);
+                const html = await response.text();
+
+                const parser = new DOMParser();
+                const newDoc = parser.parseFromString(html, "text/html");
+                const newAgentSelect = newDoc.getElementById("agentSelect");
+
+                if (newAgentSelect) {
+
+                    $('#agentSelect').select2('destroy');
+                    document.getElementById('agentSelect').innerHTML = newAgentSelect.innerHTML;
+                    initAgentSelect2();
+                }
+            } catch (err) {
+
+            } finally {
+                spinner.style.display = 'none';
+            }
+        }
+
+        $('#searchBtn').on('click', reloadAssessments);
+        $('#departmentSelect').on('change', reloadDepartmentOnly);
+
+
+        function applyTableFeatures() {
+            const table = document.getElementById("operatorTable");
+            const searchInput = document.getElementById("tableSearch");
+            if (!table || !searchInput) return;
+
+
+            searchInput.addEventListener("keyup", function () {
+                const query = this.value.toLowerCase();
+                const rows = table.querySelectorAll("tbody tr");
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(query) ? "" : "none";
+                });
+            });
+
+
+            const rows = table.querySelectorAll(".clickable-row");
+            rows.forEach(row => {
+                row.addEventListener("click", () => {
+                    const href = row.getAttribute("data-href");
+                    if (href) window.location.href = href;
+                });
+            });
+        }
+    </script>
+}

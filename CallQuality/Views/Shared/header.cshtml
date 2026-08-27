@@ -1,0 +1,154 @@
+﻿@using CallQuality.Core.Helpers
+
+@using CallQuality.Services
+@using Microsoft.AspNetCore.Http
+@inject IUserSession AuthService
+
+@{
+    var username = AuthService.GetUserName();
+
+    var displayName = username;
+
+    if (displayName.Contains("@"))
+    {
+        displayName = displayName.Split('@')[0];
+    }
+
+    if (displayName.Contains("\\"))
+    {
+        displayName = displayName.Split('\\').Last();
+    }
+
+    displayName = displayName.Replace(".", " ");
+
+    displayName = System.Globalization.CultureInfo.CurrentCulture.TextInfo
+        .ToTitleCase(displayName.ToLower());
+
+    var initials = displayName
+        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Select(s => s[0].ToString().ToUpper())
+        .DefaultIfEmpty("U")
+        .Aggregate("", (a, b) => a + b);
+
+    var roles = await AuthService.GetUserRolesAsync();
+
+    var rolesText = string.Join(", ", roles);
+
+    var isManager = roles.Contains("Manager");
+    var isAssessor = roles.Contains("Assessor");
+    var isIT = roles.Contains("IT");
+
+
+    var activeViewMode = Context.Session.GetString("ActiveViewMode");
+
+    if (string.IsNullOrWhiteSpace(activeViewMode))
+    {
+        if (isManager)
+        {
+            activeViewMode = "Manager";
+        }
+        else if (isAssessor)
+        {
+            activeViewMode = "Assessor";
+        }
+        else if (isIT)
+        {
+            activeViewMode = "IT";
+        }
+        else
+        {
+            activeViewMode = "Home";
+        }
+    }
+
+    var showManagerView = activeViewMode == "Manager";
+    var showAssessorView = activeViewMode == "Assessor";
+    var showITView = activeViewMode == "IT";
+}
+
+<header class="header-wrapper">
+
+    <div class="header-top-container position-relative">
+        <div class="header-top d-flex justify-content-between align-items-center px-4 py-3">
+            <img src="~/logo2.png" alt="HealthWindow Logo" class="header-logo" />
+        </div>
+    </div>
+
+    <div class="user">
+        <div class="user-badge">@initials</div>
+        <span>@displayName</span>
+
+        <span class="visually-hidden" id="user-roles">@rolesText</span>
+
+        <a asp-controller="Account"
+           asp-action="Logout"
+           class="text-white text-decoration-none fw-medium">
+            Log Out
+        </a>
+    </div>
+
+    <nav class="header-nav d-flex align-items-center justify-content-between px-4">
+        <div class="nav-links d-flex gap-4">
+
+         
+            @if (isManager && showManagerView)
+            {
+                <a class="nav-link" asp-controller="Manager" asp-action="Index">Manager Overview</a>
+                <a class="nav-link" asp-controller="Manager" asp-action="Assessments">New Over Assessment</a>
+                <a class="nav-link" asp-controller="Manager" asp-action="ReportHome">Reports</a>
+                <a class="nav-link" asp-controller="Manager" asp-action="ManageQuestions">Manage Questions</a>
+                <a class="nav-link" asp-controller="TrainingRegister" asp-action="Index">Training Register</a>
+                <a class="nav-link" asp-controller="Assessor" asp-action="OperatorAssessment">View Operator Assessment</a>
+                <a class="nav-link" asp-controller="IT" asp-action="Index">Admin Tools</a>
+            }
+            else if (isAssessor && showAssessorView)
+            {
+                <a class="nav-link" asp-controller="Assessor" asp-action="NewAssessment">New Assessment</a>
+                <a class="nav-link" asp-controller="Assessor" asp-action="Report">Report</a>
+                <a class="nav-link" asp-controller="Assessor" asp-action="OperatorAssessment">View Assessment</a>
+                <a class="nav-link" asp-controller="TrainingRegister" asp-action="Index">Training Register</a>
+            }
+            else if (isIT && showITView)
+            {
+                <a class="nav-link" asp-controller="IT" asp-action="Index">Admin Tools</a>
+            }
+            else if (isManager)
+            {
+                <a class="nav-link" asp-controller="Manager" asp-action="Index">Manager Overview</a>
+                <a class="nav-link" asp-controller="Manager" asp-action="Assessments">New Over Assessment</a>
+                <a class="nav-link" asp-controller="Manager" asp-action="ReportHome">Reports</a>
+                <a class="nav-link" asp-controller="Manager" asp-action="ManageQuestions">Manage Questions</a>
+                <a class="nav-link" asp-controller="TrainingRegister" asp-action="Index">Training Register</a>
+                <a class="nav-link" asp-controller="Assessor" asp-action="OperatorAssessment">View Operator Assessment</a>
+            }
+            else if (isAssessor)
+            {
+                <a class="nav-link" asp-controller="Assessor" asp-action="NewAssessment">New Assessment</a>
+                <a class="nav-link" asp-controller="Assessor" asp-action="Report">Report</a>
+                <a class="nav-link" asp-controller="Assessor" asp-action="OperatorAssessment">View Assessment</a>
+                <a class="nav-link" asp-controller="TrainingRegister" asp-action="Index">Training Register</a>
+            }
+            else if (isIT)
+            {
+                <a class="nav-link" asp-controller="IT" asp-action="Index">Admin Tools</a>
+            }
+            else
+            {
+                <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
+            }
+
+            @if (isManager && isAssessor)
+            {
+                var switchTo = showManagerView ? "Assessor" : "Manager";
+
+                <a class="nav-link text-warning"
+                   asp-controller="Nav"
+                   asp-action="Switch"
+                   asp-route-mode="@switchTo">
+                    Switch to @switchTo View
+                </a>
+            }
+
+        </div>
+    </nav>
+</header>

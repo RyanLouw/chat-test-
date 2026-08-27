@@ -1,0 +1,851 @@
+﻿@using System.Text.Json
+@using CallQuality.Core.Manager.QuestionsManager.Models
+@model QuestionTypeDTO
+
+<div class="container-fluid py-4">
+    <h1 class="display-5 fw-bold text-center mb-4" style="color:#0B5B75;">Manage Questions</h1>
+
+
+
+
+    <ul class="nav nav-tabs mb-4 border-bottom border-2" id="questionTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-semibold text-primary" id="by-question-tab"
+                    data-bs-toggle="tab" data-bs-target="#by-question" type="button" role="tab"
+                    aria-controls="by-question" aria-selected="true">
+                 By Question
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold text-primary" id="by-type-tab"
+                    data-bs-toggle="tab" data-bs-target="#by-type" type="button" role="tab"
+                    aria-controls="by-type" aria-selected="false">
+                 By Subgroup Type
+            </button>
+        </li>
+    </ul>
+
+
+
+    <div class="tab-content" id="questionTabsContent">
+
+        <div class="tab-pane fade show active" id="by-question" role="tabpanel" aria-labelledby="by-question-tab">
+           
+            <div class="table-actions d-flex justify-content-end mb-3">
+                <input type="text"
+                       id="searchQuestionInput"
+                       class="form-control assessor-breakdown-search"
+                       placeholder=" Search Question..."
+                       style="max-width: 350px; border-radius: 6px;">
+            </div>
+
+            <div class="d-flex justify-content-end mb-3">
+                <button class="btn btn-success" id="btnNewQuestion">
+                    <i class="bi bi-plus-circle me-2"></i>New Question
+                </button>
+            </div>
+
+            <div class="accordion" id="questionsAccordion">
+                @if (Model?.QuestionsByType != null && Model.QuestionsByType.Any())
+                {
+                    int index = 0;
+                    foreach (var q in Model.QuestionsByType)
+                    {
+                        var collapseId = $"collapseQ{index}";
+                        <div class="accordion-item mb-3 shadow-sm">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed fw-semibold" type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#@collapseId"
+                                        aria-expanded="false"
+                                        aria-controls="@collapseId">
+                                    <span>@q.Question.QuestionValue</span>
+                                </button>
+                            </h2>
+                          
+                            <div id="@collapseId" class="accordion-collapse collapse" data-bs-parent="#questionsAccordion">
+                                <div class="accordion-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="fw-bold text-secondary mb-0">Question ID: @q.Question.QuestionId</h6>
+                                        <button type="button"
+                                                class="btn btn-primary btn-sm edit-question-btn"
+                                                data-id="@q.Question.QuestionId"
+                                                data-question="@q.Question.QuestionValue">
+                                            <i class="bi bi-pencil-square me-1"></i>Edit
+                                        </button>
+                                    </div>
+
+                                    <table class="table table-sm table-striped align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Score</th>
+                                                <th>Active</th>
+                                                <th>Subgroup</th>
+                                                <th>Assessment Type</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        @if (q.QuestionInTypes != null && q.QuestionInTypes.Any())
+                                        {
+                                            foreach (var qit in q.QuestionInTypes)
+                                            {
+                                                <tr class="@(qit.Active == true ? "table-success" : "")">
+                                                    <td>@qit.Score</td>
+
+                                                    <td>
+                                                        @if (qit.Active == true)
+                                                        {
+                                                            <i class="bi bi-check-circle-fill text-success"></i>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="bi bi-x-circle-fill text-danger"></i>
+                                                        }
+                                                    </td>
+
+                                                    <td>@(qit.SubGroupType?.SubGroupValue ?? "No subgroup")</td>
+                                                    <td>@(qit.SubGroupType?.AssessmentType?.TypeName ?? "No assessment type")</td>
+                                                </tr>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted">
+                                                    No QuestionInTypes were loaded for this question.
+                                                </td>
+                                            </tr>
+                                        }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                        </div>
+                        index++;
+                    }
+                }
+                else
+                {
+                    <p class="text-center text-muted">No questions available.</p>
+                }
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="by-type" role="tabpanel" aria-labelledby="by-type-tab">
+            <div class="mb-4 d-flex flex-wrap align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <label class="fw-semibold">Select Type:</label>
+                    <select id="subGroupTypeSelect" class="custom-select" style="min-width: 280px;">
+                        <option value="">-- Select Subgroup Type --</option>
+                        @foreach (var type in Model.SubGroupTypesWithQuestions)
+                        {
+                            <option value="@type.SubGroupTypeId">@type.AssessmentType - @type.SubGroupValue</option>
+                        }
+                    </select>
+                </div>
+                <div class="mt-3 text-end">
+                    <button class="btn btn-success" id="saveOrderBtn">Save Changes</button>
+                    <button class="btn btn-success" id="saveSubgroupBtn">New Template </button>
+                </div>
+            </div>
+          
+
+
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-hover align-middle" id="questionsByTypeTable">
+                    <thead class="custom-thead">
+                        <tr>
+                            <th style="width: 120px;">Question ID</th>
+                            <th>Question</th>
+                            <th style="width: 130px;">Order</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-3">
+                                Select a type to view questions.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+
+
+
+
+        </div>
+
+    </div>
+
+   
+</div>
+
+<!-- 🔹 NewSubgroup Modal -->
+
+<div class="modal fade" id="createSubgroupModal" tabindex="-1" aria-labelledby="createSubgroupLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createSubgroupLabel">Create New Subgroup</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Subgroup Name</label>
+                    <input type="text" id="subgroupName" class="form-control" placeholder="Enter subgroup name">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Assessment Type</label>
+                    <select id="assessmentTypeSelect" class="form-select">
+                        <option value="">-- Select Assessment Type --</option>
+                        @foreach (var type in Model.AssessmentTypes)
+                        {
+                            <option value="@type.AssessmentTypeId">
+                                @type.TypeName
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <h6 class="fw-semibold mb-2">Link Questions</h6>
+                    <div class="list-group" id="questionList">
+                        @foreach (var question in Model.Questions)
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <input type="checkbox" class="link-question-checkbox" value="@question.QuestionId">
+                                    <span class="ms-2">@question.QuestionValue</span>
+                                </div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    <input type="number" class="form-control form-control-sm question-score" placeholder="Score" style="width: 80px;">
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="saveSubgroup">Save Subgroup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+                <!-- 🔹 Edit Modal -->
+<div class="modal fade" id="editQuestionModal" tabindex="-1" aria-labelledby="editQuestionLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header gradient-header">
+                <h5 class="modal-title fw-bold" id="editQuestionLabel">Edit Question</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4">
+                <form id="editQuestionForm">
+                    <div class="mb-4">
+                        <h6 class="fw-semibold">Question</h6>
+                        <input type="text" id="txtQuestion" class="form-control" readonly>
+                        <input type="hidden" id="hdnQuestionId">
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="fw-semibold">Default Feedback</h6>
+                        <textarea id="txtDefaultFeedback" class="form-control" rows="3" placeholder="Enter default feedback..."></textarea>
+                    </div>
+
+                    <div>
+                        <h6 class="fw-semibold mb-3">Subgroups</h6>
+                        <div id="subgroupContainer" class="row g-3"></div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-success" id="btnSaveChanges">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- 🔹 New Modal -->
+<div class="modal fade" id="createQuestionModal" tabindex="-1" aria-labelledby="createQuestionLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header gradient-header">
+                <h5 class="modal-title fw-bold" id="createQuestionLabel">Create New Question</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4">
+                <form id="createQuestionForm">
+                    <div class="mb-4">
+                        <h6 class="fw-semibold">Question</h6>
+                        <input type="text" id="txtNewQuestion" class="form-control" placeholder="Enter new question...">
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="fw-semibold">Default Feedback</h6>
+                        <textarea id="txtNewFeedback" class="form-control" rows="3" placeholder="Enter default feedback..."></textarea>
+                    </div>
+
+                    <div>
+                        <h6 class="fw-semibold mb-3">Assign to Subgroups</h6>
+                        <div id="newSubgroupContainer" class="row g-3"></div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button class="btn btn-success" id="btnCreateQuestion">Create Question</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+@section Scripts {
+    <script>
+
+
+        document.getElementById('saveSubgroupBtn').addEventListener('click', function () {
+            var modal = new bootstrap.Modal(document.getElementById('createSubgroupModal'));
+            modal.show();
+        });
+               document.getElementById('saveSubgroup').addEventListener('click', async () => {
+            const subgroupName = document.getElementById('subgroupName').value.trim();
+            const assessmentTypeId = parseInt(document.getElementById('assessmentTypeSelect').value, 10);
+
+            const linkedQuestions = [];
+            document.querySelectorAll('.link-question-checkbox').forEach(checkbox => {
+                if (checkbox.checked) {
+                    const questionId = parseInt(checkbox.value, 10);
+                    const score = parseInt(checkbox.closest('.list-group-item').querySelector('.question-score').value, 10) || 0;
+
+                    linkedQuestions.push({
+                        questionId: questionId,
+                        active: true,
+                        score: score
+                    });
+                }
+            });
+
+            if (!subgroupName || isNaN(assessmentTypeId)) {
+                alert('Please provide a name and select an assessment type.');
+                return;
+            }
+
+            const dto = {
+                subGroupValue: subgroupName,
+                assessmentTypeId: assessmentTypeId,
+                linkedQuestions: linkedQuestions
+            };
+
+            AppLoader.show("Creating subgroup...");
+
+            try {
+                const response = await fetch('/Manager/SaveNewSubgroupOrder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dto)
+                });
+
+                if (response.ok) {
+                    alert('Subgroup created successfully!');
+                    AppLoader.show("Reloading page...");
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert(error.message || 'Failed to create subgroup.');
+                }
+            } catch (e) {
+
+                alert('Error while sending the request.');
+            } finally {
+                AppLoader.hide();
+            }
+        });
+
+
+
+        const allQuestions = @Html.Raw(JsonSerializer.Serialize(Model.QuestionsByType));
+
+        document.getElementById("searchQuestionInput").addEventListener("input", function () {
+            const query = this.value.trim().toLowerCase();
+            const accordionItems = document.querySelectorAll("#questionsAccordion .accordion-item");
+
+            accordionItems.forEach(item => {
+                const questionText = item.querySelector(".accordion-button span")?.textContent.toLowerCase() || "";
+                item.style.display = questionText.includes(query) ? "" : "none";
+            });
+        });
+
+
+        document.addEventListener("click", e => {
+            const btn = e.target.closest(".edit-question-btn");
+            if (!btn) return;
+
+            const id = btn.dataset.id;
+            const questionText = btn.dataset.question;
+
+
+            const current = allQuestions.find(q => q.Question.QuestionId?.toString() === id.toString());
+            if (!current) {
+               
+                alert("Could not find question data.");
+                return;
+            }
+
+
+            document.getElementById("hdnQuestionId").value = id;
+            document.getElementById("txtQuestion").value = current.Question.QuestionValue;
+            document.getElementById("txtDefaultFeedback").value = current.Question.DefaultFeedback ?? "";
+
+            const container = document.getElementById("subgroupContainer");
+            container.innerHTML = "";
+
+            subGroupTemplates.forEach((template, i) => {
+                    const existing = current.QuestionInTypes?.find(qit =>
+                        Number(qit.SubGroupTypeId) === Number(template.SubGroupTypeId)
+                    );
+
+                    const isActive = existing?.Active === true;
+                    const score = existing?.Score ?? 0;
+
+                    const type = template.AssessmentType ?? "Unknown";
+                    const subGroup = template.SubGroupValue ?? "";
+
+                    const typeIcon = (() => {
+                        switch ((type || "").toLowerCase()) {
+                            case "dischem prp": return "/icons/DischemPRP.svg";
+                            case "dischem srs": return "/icons/DischemSRS.svg";
+                            case "prp": return "/icons/PRP.svg";
+                            case "srs": return "/icons/DischemSRS.svg";
+                            case "psp": return "/icons/PSP.svg";
+                            case "ae": return "/icons/AE.svg";
+                            default: return "/icons/default.svg";
+                        }
+                    })();
+
+                    container.innerHTML += `
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <div class="card subgroup-card p-3 text-center shadow-sm ${isActive ? 'border-success bg-light' : ''}"
+                                 data-active="${isActive}"
+                                 data-subgroupid="${template.SubGroupTypeId ?? 0}"
+                                 onclick="toggleSubgroup(this)">
+                                <div class="subgroup-icon">
+                                    <img src="${typeIcon}" alt="${type}" class="subgroup-icon-img">
+                                </div>
+
+                                <h6 class="fw-semibold mb-1">${type}</h6>
+                                <p class="text-muted small mb-2">${subGroup}</p>
+
+                                <div class="d-flex justify-content-center align-items-center gap-2 mt-2">
+                                    <label class="fw-semibold text-success mb-0">Score:</label>
+                                    <input type="number"
+                                           class="form-control form-control-sm text-center fw-bold text-success subgroup-score"
+                                           value="${score}"
+                                           min="0"
+                                           max="100"
+                                           style="width:80px;"
+                                           onclick="event.stopPropagation();">
+                                </div>
+                            </div>
+                        </div>`;
+                });
+
+            const modalEl = document.getElementById("editQuestionModal");
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        });
+
+
+     
+        const subGroupTemplates = @Html.Raw(JsonSerializer.Serialize(Model.SubGroupTypesWithQuestions));
+        document.getElementById("btnNewQuestion").addEventListener("click", () => {
+            const container = document.getElementById("newSubgroupContainer");
+            container.innerHTML = "";
+
+            subGroupTemplates.forEach(t => {
+                const typeIcon = (() => {
+                    switch ((t.AssessmentType || "").toLowerCase()) {
+                        case "dischem prp": return "/icons/DischemPRP.svg";
+                        case "dischem srs": return "/icons/DischemSRS.svg";
+                        case "prp": return "/icons/PRP.svg";
+                        case "psp": return "/icons/PSP.svg";
+                        case "ae": return "/icons/AE.svg";
+                        default: return "/icons/default.svg";
+                    }
+                })();
+
+                container.innerHTML += `
+                    <div class="col-6 col-md-4 col-lg-3">
+                        <div class="card subgroup-card p-3 text-center shadow-sm"
+                             data-active="false"
+                             data-subgroupid="${t.SubGroupTypeId ?? 0}"
+                             onclick="toggleCreateSubgroup(this)">
+                            <div class="subgroup-icon">
+                                <img src="${typeIcon}" alt="${t.AssessmentType}" class="subgroup-icon-img">
+                            </div>
+                            <h6 class="fw-semibold mb-1">${t.AssessmentType}</h6>
+                            <p class="text-muted small mb-2">${t.SubGroupValue}</p>
+                            <div class="d-flex justify-content-center align-items-center gap-2">
+                                <label class="fw-semibold text-success mb-0">Score:</label>
+                                <input type="number" class="form-control form-control-sm text-center fw-bold text-success subgroup-score"
+                                       value="0" min="0" max="100" style="width:80px;">
+                            </div>
+                        </div>
+                    </div>`;
+            });
+
+            const modalEl = document.getElementById("createQuestionModal");
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        });
+
+
+
+
+
+
+        const subGroupTypesWithQuestions = @Html.Raw(JsonSerializer.Serialize(Model.SubGroupTypesWithQuestions));
+
+
+        document.getElementById("subGroupTypeSelect").addEventListener("change", function () {
+            const selectedId = parseInt(this.value);
+            const tbody = document.querySelector("#questionsByTypeTable tbody");
+            tbody.innerHTML = "";
+
+            if (!selectedId) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Select a type to view questions.</td></tr>`;
+                return;
+            }
+
+
+            const selectedType = subGroupTypesWithQuestions.find(t => t.SubGroupTypeId === selectedId);
+            if (!selectedType || !selectedType.Questions || selectedType.Questions.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">No questions found for this type.</td></tr>`;
+                return;
+            }
+           const sortedQuestions = selectedType.Questions.sort((a, b) => {
+
+            const orderA = a.OrderNumber ?? 0;
+            const orderB = b.OrderNumber ?? 0;
+            if (orderA !== orderB) return orderA - orderB;
+
+           
+            return a.QuestionValue.localeCompare(b.QuestionValue, undefined, { sensitivity: 'base' });
+           });
+
+
+              tbody.innerHTML = "";
+               sortedQuestions.forEach((q, index) => {
+               const displayOrder = index + 1;
+               const qit = q.QuestionInTypes?.find(x => x.SubGroupTypeId === selectedId);
+               const score = qit ? qit.Score : (q.Score ?? 0);
+
+               tbody.innerHTML += `
+                <tr draggable="true" data-question-id="${q.QuestionId}">
+                    <td>${q.QuestionId}</td>
+                    <td>${q.QuestionValue}</td>
+                    <td class="order-cell text-center">
+                        <span class="order-num">${displayOrder}</span>
+                        <button class="btn btn-sm btn-outline-secondary move-up">⬆️</button>
+                         <button class="btn btn-sm btn-outline-secondary move-down">⬇️</button>
+                    </td>
+                </tr>`;
+              });
+
+        });
+
+
+
+        const tbody = document.querySelector("#questionsByTypeTable tbody");
+        let draggedRow = null;
+
+
+        tbody.addEventListener("dragstart", e => {
+            draggedRow = e.target.closest("tr");
+            e.target.classList.add("dragging");
+        });
+
+        tbody.addEventListener("dragover", e => {
+            e.preventDefault();
+            const target = e.target.closest("tr");
+            if (target && target !== draggedRow) {
+                const rect = target.getBoundingClientRect();
+                const next = (e.clientY - rect.top) / (rect.height / 2) > 1;
+                tbody.insertBefore(draggedRow, next ? target.nextSibling : target);
+            }
+        });
+
+        tbody.addEventListener("drop", () => {
+            draggedRow.classList.remove("dragging");
+            draggedRow = null;
+            updateOrderNumbers();
+        });
+
+
+        tbody.addEventListener("click", e => {
+            const btn = e.target.closest("button");
+            if (!btn) return;
+
+            const row = btn.closest("tr");
+            if (!row) return;
+
+            const rows = Array.from(tbody.querySelectorAll("tr"));
+            const index = rows.indexOf(row);
+
+            if (btn.classList.contains("move-up") && index > 0) {
+                tbody.insertBefore(row, rows[index - 1]);
+            }
+            else if (btn.classList.contains("move-down") && index < rows.length - 1) {
+                tbody.insertBefore(row, rows[index + 1].nextSibling);
+            }
+
+            updateOrderNumbers();
+        });
+
+
+        function updateOrderNumbers() {
+            Array.from(tbody.querySelectorAll("tr")).forEach((r, i) => {
+                const orderCell = r.querySelector(".order-num");
+                if (orderCell) orderCell.textContent = i + 1;
+            });
+        }
+
+        function getUpdatedOrder() {
+            return Array.from(tbody.querySelectorAll("tr")).map((r, i) => ({
+                QuestionId: parseInt(r.dataset.questionId),
+                NewOrderNumber: i + 1
+            }));
+        }
+
+        function toggleCreateSubgroup(card) {
+            const isActive = card.dataset.active === "true";
+            const nowActive = !isActive;
+
+            card.dataset.active = nowActive.toString();
+            card.classList.toggle("border-success", nowActive);
+            card.classList.toggle("bg-light", nowActive);
+
+
+            if (nowActive) {
+                card.classList.add("animate__animated", "animate__pulse");
+                setTimeout(() => card.classList.remove("animate__animated", "animate__pulse"), 400);
+            }
+        }
+
+
+
+        document.addEventListener("click", e => {
+            const btn = e.target.closest(".toggle-active-btn");
+            if (!btn) return;
+            const card = btn.closest(".subgroup-card");
+            const active = card.dataset.active === "true";
+            card.dataset.active = (!active).toString();
+            card.classList.toggle("border-success", !active);
+            card.classList.toggle("bg-light", !active);
+            btn.textContent = !active ? "Active" : "Activate";
+        });
+
+
+        function toggleSubgroup(card) {
+            const isActive = card.dataset.active === "true";
+            card.dataset.active = (!isActive).toString();
+            card.classList.toggle("border-success", !isActive);
+            card.classList.toggle("bg-light", !isActive);
+        }
+
+                document.getElementById("btnSaveChanges").addEventListener("click", async () => {
+            const id = parseInt(document.getElementById("hdnQuestionId").value, 10);
+            const defaultFeedback = document.getElementById("txtDefaultFeedback").value.trim();
+            const questionValue = document.getElementById("txtQuestion").value.trim();
+
+            const subgroupCards = document.querySelectorAll("#subgroupContainer .subgroup-card");
+
+            const questionInTypes = Array.from(subgroupCards).map(card => {
+                const subGroupTypeId = parseInt(card.dataset.subgroupid, 10);
+                const isActive = card.dataset.active === "true";
+                const score = parseInt(card.querySelector(".subgroup-score")?.value, 10) || 0;
+
+                return {
+                    SubGroupTypeId: subGroupTypeId,
+                    Active: isActive,
+                    Score: score
+                };
+            });
+
+            const updated = {
+                Question: {
+                    QuestionId: id,
+                    QuestionValue: questionValue,
+                    DefaultFeedback: defaultFeedback
+                },
+                QuestionInTypes: questionInTypes
+            };
+
+
+            const saveBtn = document.getElementById("btnSaveChanges");
+            saveBtn.disabled = true;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Saving...';
+
+            try {
+                const res = await fetch("/Manager/UpdateQuestion", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(updated)
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    alert("Question updated successfully!");
+
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("editQuestionModal"));
+                    modal.hide();
+
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    alert(data.message || "Failed to update question.");
+                }
+            } catch (err) {
+
+                alert("An error occurred while saving changes.");
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalText;
+            }
+        });
+      
+
+              document.getElementById("btnCreateQuestion").addEventListener("click", async () => {
+            const questionValue = document.getElementById("txtNewQuestion").value.trim();
+            const defaultFeedback = document.getElementById("txtNewFeedback").value.trim();
+
+            if (!questionValue) {
+                alert("Please enter a question text.");
+                return;
+            }
+
+            const subgroupCards = document.querySelectorAll("#newSubgroupContainer .subgroup-card");
+
+            const questionInTypes = Array.from(subgroupCards).map(card => {
+                const subGroupTypeId = parseInt(card.dataset.subgroupid);
+                const isActive = card.dataset.active === "true";
+                const score = parseInt(card.querySelector(".subgroup-score").value) || 0;
+
+                return {
+                    SubGroupTypeId: subGroupTypeId,
+                    Active: isActive,
+                    Score: score
+                };
+            });
+
+            const payload = {
+                Question: {
+                    QuestionId: 0,
+                    QuestionValue: questionValue,
+                    DefaultFeedback: defaultFeedback
+                },
+                QuestionInTypes: questionInTypes
+            };
+
+            AppLoader.show("Creating question...");
+
+            try {
+                const res = await fetch("/Manager/CreateQuestion", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    alert("Question created successfully!");
+
+                    const modal = bootstrap.Modal.getInstance(document.getElementById("createQuestionModal"));
+                    modal.hide();
+
+                    AppLoader.show("Reloading page...");
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    alert((data.message || "Failed to create question."));
+                }
+            } catch (err) {
+
+                alert("An error occurred while creating the question.");
+            } finally {
+                AppLoader.hide();
+            }
+        });
+
+
+
+             document.getElementById("saveOrderBtn").addEventListener("click", async () => {
+            const tbody = document.querySelector("#questionsByTypeTable tbody");
+            const selectedId = parseInt(document.getElementById("subGroupTypeSelect").value);
+
+            if (!selectedId) {
+                alert("Please select a subgroup type first.");
+                return;
+            }
+
+            const dto = {
+                SubGroupTypeId: selectedId,
+                Questions: Array.from(tbody.querySelectorAll("tr"))
+                    .map((r, i) => ({
+                        QuestionId: parseInt(r.dataset.questionId),
+                        OrderNumber: i + 1
+                    }))
+                    .filter(x => Number.isFinite(x.QuestionId))
+            };
+
+            if (!dto.Questions || dto.Questions.length === 0) {
+                alert("No questions to save.");
+                return;
+            }
+
+            AppLoader.show("Saving question order...");
+
+            try {
+                const res = await fetch("/Manager/SaveOrder", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(dto)
+                });
+
+                const raw = await res.text();
+
+                let result;
+                try {
+                    result = JSON.parse(raw);
+                } catch {
+                    result = null;
+                }
+
+                if (res.ok && result?.success !== false) {
+                    alert("Order saved successfully!");
+                } else {
+                    alert((result?.message || "Server error while saving order."));
+                }
+            } catch (err) {
+
+                alert("An error occurred while saving the order.");
+            } finally {
+                AppLoader.hide();
+            }
+        });
+
+
+
+
+    </script>
+}

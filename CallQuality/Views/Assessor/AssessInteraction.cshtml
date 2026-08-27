@@ -1,0 +1,580 @@
+﻿@using CallQuality.Core.Manager.AssessmentsManager.Models
+@model AssessInteractionVM
+
+<input type="hidden" id="AssessModelJson"
+       value='@System.Text.Json.JsonSerializer.Serialize(Model)' />
+
+
+<div class="call-header mb-4">
+
+    <!-- WRAPPER CARD -->
+    <div class="call-info-card department-card shadow-sm">
+
+        <!-- CONTENT GRID -->
+        <div class="row g-3 pt-2">
+
+            @if (Model.IsPsp)
+            {
+                <div class="col-md-6">
+                    <strong>PSP Name:</strong> @Model.PspInteraction.PspName
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Patient ID:</strong> @Model.PspInteraction.PatientID
+                </div>
+
+                <div class="col-md-6">
+                    <strong>HW Number:</strong> @Model.PspInteraction.HWNumber
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Contact Person:</strong> @Model.PspInteraction.ContactPerson
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Cell Number:</strong> @Model.PspInteraction.CellNumber
+                </div>
+            }
+            else
+            {
+                <div class="col-md-6">
+                    <strong>Contact ID:</strong> @Model.Interaction.ContactID
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Order ID:</strong> @Model.Interaction.OrderID
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Family Identifier:</strong> @Model.Interaction.FamilyIdentifier
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Pharmacy Group:</strong> @Model.Interaction.PharmacyGroup
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Pharmacy Name:</strong> @Model.Interaction.PharmacyName
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Profile Number:</strong> @Model.Interaction.Profile
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Cell:</strong> @Model.Interaction.CellNumber
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Home:</strong> @Model.Interaction.HomeNumber
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Work:</strong> @Model.Interaction.WorkNumber
+                </div>
+            }
+
+        </div>
+    </div>
+
+</div>
+
+<hr />
+
+<!-- ======================================= -->
+<!-- CALL INFO -->
+<!-- ======================================= -->
+<div class="call-info card p-3 mb-4 shadow-sm">
+    <h4>Call Information</h4>
+
+    @if (Model.CallInteraction == null || !Model.CallInteraction.Any())
+    {
+        <p class="text-muted">No call records found for this number/extension.</p>
+    }
+    else
+    {
+        <table class="table table-striped table-bordered mt-3">
+            <thead class="table-light">
+                <tr>
+                    <th>Date</th>
+                    <th>Duration</th>
+                    <th>Answered</th>
+                    <th>Number</th>
+                    <th>Recording</th>
+                    <th>Select</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var call in Model.CallInteraction)
+                {
+                    <tr>
+                        <td>@call.CallDateTime.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@call.DurationMinutes</td>
+                        <td>@(call.IsAnswered ? "Yes" : "No")</td>
+                        <td>@call.CallerNumber</td>
+
+                        <td>
+                            @if (!string.IsNullOrWhiteSpace(call.RecordingID))
+                            {
+                                <button class="btn btn-sm btn-primary"
+                                        onclick="downloadRecording('@call.RecordingID')">
+                                    Download
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="text-muted">No Recording</span>
+                            }
+                        </td>
+
+                        <!--   SELECT CALL BUTTON -->
+                        <td>
+                            <button class="btn btn-sm btn-success"
+                                    onclick="selectCallForAssessment('@call.RecordingID', '@call.CallerNumber')">
+                                Select
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+
+
+
+<!-- ======================================= -->
+<!-- SUBGROUP SELECTION MODAL -->
+<!-- ======================================= -->
+@if (Model.SelectedSubGroupId == null || !Model.SelectedSubGroupId.Any())
+{
+    <div class="modal fade show"
+         id="subGroupModal"
+         aria-hidden="false"
+         style="display:block; background:rgba(0,0,0,0.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg">
+
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        Select Assessment Categories
+                    </h5>
+                </div>
+
+                <div class="modal-body">
+                    <p class="mb-3">
+                        Please choose one or more question groups:
+                    </p>
+
+                    <form id="subGroupForm">
+
+                        <div class="d-grid gap-2 mb-3">
+                            @foreach (var sg in Model.SubGroup)
+                            {
+                                var checkboxId =
+                                $"subGroup_{sg.SubGroupTypeId}";
+
+                                <label class="subgroup-option"
+                                       for="@checkboxId">
+
+                                    <input type="checkbox"
+                                           class="form-check-input subgroup-checkbox"
+                                           id="@checkboxId"
+                                           name="SelectedSubGroupId"
+                                           value="@sg.SubGroupTypeId" />
+
+                                    <span class="subgroup-label">
+                                        @sg.SubGroupValue
+                                    </span>
+                                </label>
+                            }
+                        </div>
+
+                        <div id="subGroupValidation"
+                             class="text-danger mb-3"
+                             style="display:none;">
+                            Please select at least one category.
+                        </div>
+
+                        <div class="text-end">
+                            <button type="submit"
+                                    class="btn btn-primary">
+                                Continue
+                            </button>
+                        </div>
+
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.body.classList.add("modal-open");
+    </script>
+}
+<!-- SCORE SUMMARY -->
+<div id="scoreSummary" class="alert alert-info" style="display:none;"></div>
+
+<!-- ======================================= -->
+<!-- QUESTIONS SECTION -->
+<!-- ======================================= -->
+<div id="questionsContainer" class="questions card p-3 mb-4 shadow-sm">
+    @if (Model.SelectedSubGroupId is null)
+    {
+        <h4>Assessment Questions</h4>
+        <p class="text-muted">Select a category first...</p>
+    }
+    else
+    {
+        @await Html.PartialAsync("_QuestionsPartial", Model)
+    }
+</div>
+
+<!-- ======================================= -->
+<!-- AUTO FEEDBACK -->
+<!-- ======================================= -->
+<div id="autoFeedbackContainer" class="auto-feedback card p-3 mb-4 shadow-sm">
+    <h4>Default Feedback</h4>
+
+    <div id="autoFeedbackContent">
+        @if (!string.IsNullOrEmpty(Model.AutoFeedback))
+        {
+            <div class="alert alert-warning">@Html.Raw(Model.AutoFeedback)</div>
+        }
+        else
+        {
+            <p>No automatic feedback yet.</p>
+        }
+    </div>
+</div>
+
+<!-- ======================================= -->
+<!-- MANUAL FEEDBACK -->
+<!-- ======================================= -->
+<div class="assessor-feedback card p-3 mb-4 shadow-sm">
+    <h4>Your Feedback</h4>
+
+    <textarea class="form-control mb-3"
+              rows="4"
+              id="manualFeedbackBox"
+              name="AdditionalFeedback">@Model.AdditionalFeedback</textarea>
+
+    
+    <button id="submitFinalBtn" type="button"
+            class="btn btn-success btn-lg">
+        Submit Final Assessment
+    </button>
+</div>
+
+
+
+
+
+<!-- SELECT CALL MODAL -->
+<div class="modal fade" id="selectCallModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Confirm Selected Call</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <p>You selected the following call to save:</p>
+
+                <ul class="list-group">
+                    <li class="list-group-item"><strong>Date:</strong> <span id="sc_date"></span></li>
+                    <li class="list-group-item"><strong>Duration:</strong> <span id="sc_duration"></span></li>
+                    <li class="list-group-item"><strong>Number:</strong> <span id="sc_number"></span></li>
+                    <li class="list-group-item"><strong>Recording:</strong> <span id="sc_recording"></span></li>
+                </ul>
+
+                <input type="hidden" id="SelectedCallJson" />
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-success" id="confirmSelectedCall">Use This Call</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        $("#subGroupForm").on("submit", function (e) {
+            debugger;
+            e.preventDefault();
+
+        const selectedSubGroupIds = $(".subgroup-checkbox:checked")
+            .map(function () {
+                return Number($(this).val());
+            })
+            .get()
+            .filter(id => id > 0);
+
+            const fullModelJson = $("#AssessModelJson").val();
+
+            if (selectedSubGroupIds.length === 0) {
+                alert("Please select at least one group.");
+                return;
+            }
+
+            console.log("Selected subgroup IDs:", selectedSubGroupIds);
+
+            AppLoader.show("Loading questions...");
+
+            $.ajax({
+                url: "/Assessor/SelectSubGroup",
+                method: "POST",
+                contentType: "application/json; charset=utf-8",
+
+                data: JSON.stringify({
+                    selectedSubGroupId: selectedSubGroupIds,
+                    fullModel: fullModelJson
+                }),
+
+                success: function (result) {
+                    if (result.success) {
+                        $("#questionsContainer").html(result.html);
+                        $("#AssessModelJson").val(result.updatedModel);
+                        $("#subGroupModal").hide();
+                        $(".modal-backdrop").remove();
+                        document.body.classList.remove("modal-open");
+                    } else {
+                        alert(result.message || "Could not load questions.");
+                    }
+                },
+
+                error: function (xhr) {
+                    console.error("Status:", xhr.status);
+                    console.error("Response:", xhr.responseText);
+
+                    let message = "An error occurred while loading questions.";
+
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+
+                        if (response.message) {
+                            message = response.message;
+                        }
+
+                        if (response.errors) {
+                            console.error("Validation errors:", response.errors);
+                        }
+                    } catch {
+
+                    }
+
+                    alert(message);
+                },
+
+                complete: function () {
+                    AppLoader.hide();
+                }
+            });
+        });
+
+
+        $(document).on("click", "#btnCalculate", function () {
+
+            let formArray = $("#questionsForm").serializeArray();
+            let fullModel = JSON.parse($("#AssessModelJson").val());
+
+            let answers = {};
+            formArray.forEach(item => {
+                let key = item.name.replace("Answers[", "").replace("]", "");
+                answers[key] = item.value;
+            });
+
+            fullModel.Answers = answers;
+
+            AppLoader.show("Calculating score...");
+
+            $.ajax({
+                url: "/Assessor/CalculateScore",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(fullModel),
+
+                success: function (result) {
+                    if (result.success) {
+                        $("#scoreSummary").html(result.scoreHtml).show();
+                        $("#autoFeedbackContent").html(result.autoFeedbackHtml);
+                        $("#AssessModelJson").val(result.updatedModel);
+                    } else {
+                        alert("Could not calculate score.");
+                    }
+                },
+
+                error: function () {
+                    alert("An error occurred while calculating the score.");
+                },
+
+                complete: function () {
+                    AppLoader.hide();
+                }
+            });
+        });
+
+
+        function downloadRecording(recordingId) {
+
+            AppLoader.show("Preparing recording download...");
+
+            $.ajax({
+                url: "/Assessor/GetRecordingUrl",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({ recordingId }),
+
+                success: function (res) {
+
+                    if (!res.success) {
+                        alert("No recording available.");
+                        return;
+                    }
+
+                    let realUrl = JSON.parse(res.url).url;
+                    window.open(realUrl, "_blank");
+                },
+
+                error: function () {
+                    alert("An error occurred while getting the recording.");
+                },
+
+                complete: function () {
+                    AppLoader.hide();
+                }
+            });
+        }
+
+
+        $("#submitFinalBtn").click(function () {
+
+            let fullModel = JSON.parse($("#AssessModelJson").val());
+
+            if (!fullModel.SelectedCall) {
+                alert("Please select the call that was assessed.");
+                return;
+            }
+
+            let totalQuestions = fullModel.SelectedQuestions.length;
+            let totalAnswers = Object.keys(fullModel.Answers || {}).length;
+
+            if (totalAnswers < totalQuestions) {
+                alert(`Please answer all questions. (${totalAnswers}/${totalQuestions} answered)`);
+                return;
+            }
+
+            if (fullModel.Percentage === null || fullModel.Percentage === undefined) {
+                alert("Please calculate the score before submitting.");
+                return;
+            }
+
+            if (!fullModel.AutoFeedback || fullModel.AutoFeedback.trim() === "") {
+                alert("Auto feedback is missing — please calculate score.");
+                return;
+            }
+
+            fullModel.AdditionalFeedback = $("#manualFeedbackBox").val();
+
+            if (!fullModel.AdditionalFeedback.trim()) {
+                alert("Please enter your feedback.");
+                return;
+            }
+
+            AppLoader.show("Submitting final assessment...");
+
+            $.ajax({
+                url: "/Assessor/SubmitFinal",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(fullModel),
+
+                success: function (res) {
+                    if (res.success) {
+                        window.location.href = `/Assessor/ViewOperatorAssessment/${res.id}`;
+                    } else {
+                        alert("Something went wrong while submitting the assessment.");
+                    }
+                },
+
+                error: function () {
+                    alert("An error occurred while submitting the assessment.");
+                },
+
+                complete: function () {
+                    AppLoader.hide();
+                }
+            });
+
+        });
+
+     
+
+
+        function selectCallForAssessment(recordingIdOrNumber) {
+
+            let fullModel = JSON.parse($("#AssessModelJson").val());
+            let calls = fullModel.CallInteraction;
+
+            if (!calls || calls.length === 0) {
+                alert("No call info available.");
+                return;
+            }
+
+            let selected = calls.find(c =>
+                c.RecordingID === recordingIdOrNumber ||
+                c.CallerNumber === recordingIdOrNumber
+            );
+
+            if (!selected) {
+                alert("Call not found?");
+                return;
+            }
+
+            $("#sc_date").text(new Date(selected.CallDateTime).toLocaleString());
+            $("#sc_duration").text(selected.DurationMinutes);
+            $("#sc_number").text(selected.CallerNumber);
+
+            if (selected.RecordingID) {
+                $("#sc_recording").text(selected.RecordingID);
+            } else {
+                $("#sc_recording").text("No recording");
+            }
+
+            $("#SelectedCallJson").val(JSON.stringify(selected));
+
+            let modal = new bootstrap.Modal(document.getElementById('selectCallModal'));
+            modal.show();
+        }
+
+
+        $("#confirmSelectedCall").click(function () {
+
+            let selectedCallJson = $("#SelectedCallJson").val();
+
+            if (!selectedCallJson) {
+                alert("No call selected.");
+                return;
+            }
+
+            let fullModel = JSON.parse($("#AssessModelJson").val());
+            fullModel.SelectedCall = JSON.parse(selectedCallJson);
+
+            $("#AssessModelJson").val(JSON.stringify(fullModel));
+
+            let modalElement = document.getElementById('selectCallModal');
+            bootstrap.Modal.getInstance(modalElement).hide();
+        });
+
+    </script>
+    }

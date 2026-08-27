@@ -1,0 +1,179 @@
+﻿@{
+    ViewData["Title"] = "Report Assessor Tracking";
+}
+
+<div class="container-fluid mt-4 report-assessor-tracking">
+
+    <div class="page-controls">
+        <label class="assessor-tracking-label">From Date:</label>
+        <input type="date" class="page-input" id="fromDate" />
+
+        <label class="assessor-tracking-label">To Date:</label>
+        <input type="date" class="page-input" id="toDate" />
+
+        <button class="btn-common btn-search" id="btnRetrieve">
+             Retrieve
+        </button>
+
+        <button class="btn-common btn-download" id="btnExport">
+            Export Excel
+        </button>
+    </div>
+
+
+    <div class="table-actions d-flex justify-content-end mb-2">
+        <input type="text" id="tableSearch" class="form-control" placeholder="  Search Agent, Department, or Assessor..."
+               style="max-width: 350px; border-radius: 6px;">
+    </div>
+
+    <div class="table-responsive">
+        <table class="tracking-table" id="trackingTable">
+            <thead>
+                <tr>
+                    <th>Agent</th>
+                    <th>Department</th>
+                    <th>Assessor</th>
+                    <th>Number of Assessments</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5" class="text-muted">
+                        No data available. Please select a date range and click <strong>Retrieve</strong>.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const fromInput = document.getElementById("fromDate");
+            const toInput = document.getElementById("toDate");
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth();
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+
+            const formatDate = (d) => {
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${d.getFullYear()}-${m}-${day}`;
+            };
+
+            fromInput.value = formatDate(firstDay);
+            toInput.value = formatDate(lastDay);
+        });
+
+        document.getElementById("btnRetrieve").addEventListener("click", async function () {
+            const from = document.getElementById("fromDate").value;
+            const to = document.getElementById("toDate").value;
+
+            const response = await fetch(`/Manager/GetAssessorTrackingReportAsync?from=${from}&to=${to}`);
+            const data = await response.json();
+
+            const tableBody = document.querySelector("#trackingTable tbody");
+            tableBody.innerHTML = "";
+
+            if (!data || data.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-muted py-4">
+                            No records found for the selected date range.
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            data.forEach(row => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${row.operator ?? "-"}</td>
+                    <td>${row.department ?? "-"}</td>
+                    <td>${row.assessor ?? "-"}</td>
+                    <td>${row.numberOfAssessments ?? 0}</td>
+                    <td>${row.percentage ?? 0}%</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            applyTableFeatures();
+        });
+
+        document.getElementById("btnExport").addEventListener("click", function () {
+            const from = document.getElementById("fromDate").value;
+            const to = document.getElementById("toDate").value;
+           window.location.href = `/Manager/DownloadAssessorTrackingReportExcel?from=${from}&to=${to}`;
+        });
+
+        function applyTableFeatures() {
+            const table = document.getElementById("trackingTable");
+            const searchInput = document.getElementById("tableSearch");
+
+
+            searchInput.addEventListener("keyup", function () {
+                const query = this.value.toLowerCase();
+                const rows = table.querySelectorAll("tbody tr");
+                rows.forEach(row => {
+                    const [agent, department, assessor] = row.querySelectorAll("td");
+                    const text = (agent.textContent + department.textContent + assessor.textContent).toLowerCase();
+                    row.style.display = text.includes(query) ? "" : "none";
+                });
+            });
+
+
+            const headers = table.querySelectorAll("th");
+            headers.forEach((header, index) => {
+                header.style.cursor = "pointer";
+                header.dataset.sort = "none";
+                header.innerHTML = `${header.textContent} <span class="sort-indicator">↕</span>`;
+
+                header.addEventListener("click", function () {
+                    const currentSort = header.dataset.sort;
+                    const newSort = currentSort === "asc" ? "desc" : "asc";
+
+
+                    headers.forEach(h => {
+                        h.dataset.sort = "none";
+                        h.querySelector(".sort-indicator").textContent = "↕";
+                        h.classList.remove("sorted");
+                    });
+
+
+                    header.dataset.sort = newSort;
+                    header.classList.add("sorted");
+                    header.querySelector(".sort-indicator").textContent = newSort === "asc" ? "▲" : "▼";
+
+                    sortTableByColumn(table, index, newSort === "asc");
+                });
+            });
+        }
+
+        function sortTableByColumn(table, columnIndex, asc = true) {
+            const tbody = table.tBodies[0];
+            const rows = Array.from(tbody.querySelectorAll("tr"));
+
+            rows.sort((a, b) => {
+                const aText = a.children[columnIndex].innerText.trim().replace("%", "");
+                const bText = b.children[columnIndex].innerText.trim().replace("%", "");
+
+                const aNum = parseFloat(aText);
+                const bNum = parseFloat(bText);
+
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return asc ? aNum - bNum : bNum - aNum;
+                }
+
+                return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        }
+    </script>
+}

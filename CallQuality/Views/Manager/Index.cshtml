@@ -1,0 +1,74 @@
+﻿@{
+    ViewData["Title"] = "Manager Home";
+}
+
+<div class="position-relative d-flex justify-content-end align-items-center mb-4 manager-index-top-bar">
+    <h1 class="display-5 fw-bold mb-0 position-absolute top-50 start-50 translate-middle manager-index-title">
+        Manager Overview
+    </h1>
+
+    <a asp-controller="Manager"
+       asp-action="Export"
+       class="btn btn-success manager-index-export-button">
+        Export
+    </a>
+</div>
+
+<div class="container-fluid mt-5 manager-index-overview">
+    <div class="row row-cols-1 row-cols-md-5 g-3 manager-index-department-row">
+
+        @foreach (var department in Model.Departments)
+        {
+            <div class="col manager-index-department-col">
+
+                <div class="manager-index-department-card shadow-sm p-3 h-100">
+
+                    <div class="text-center mb-3 manager-index-department-title">
+                        <div class="fw-bold fs-5 manager-index-department-name">
+                            @department.DepartmentName
+                        </div>
+                    </div>
+
+                    <div class="manager-index-department-header">
+                        <table class="table table-sm align-middle mb-0 text-center manager-index-department-header-table">
+                            <thead>
+                                <tr>
+                                    <th>Agent Name</th>
+                                    <th>Times Assessed</th>
+                                </tr>
+                            </thead>
+                        </table>
+                    </div>
+
+                    <div class="manager-index-department-body-scroll">
+                        <table class="table table-sm table-hover align-middle mb-0 text-center manager-index-department-body-table">
+                            <tbody>
+
+                                @foreach (var agent in department.Agents)
+                                {
+                                    var isLow = agent.AssessmentsDone < 6
+                                        ? "text-danger fw-semibold"
+                                        : "";
+
+                                    <tr>
+                                        <td class="text-truncate">
+                                            @agent.DisplayName
+                                        </td>
+
+                                        <td class="@isLow">
+                                            @agent.AssessmentsDone
+                                        </td>
+                                    </tr>
+                                }
+
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+
+            </div>
+        }
+
+    </div>
+</div>

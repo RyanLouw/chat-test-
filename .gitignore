@@ -1,0 +1,10 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/CallQuality/bin
+/CallQuality/obj
+/CallQuality.DataAccess/bin
+/CallQuality.DataAccess/obj
+CallQuality/appsettings.Development.json

@@ -1,0 +1,259 @@
+﻿@using CallQuality.Core.Manager.AssessmentsManager.Models
+@model ReassessmentDTO
+
+<div class="container mt-4">
+
+    <h2 class="text-primary fw-bold mb-4">
+        🔄 Reassessing Assessment @Model.AssessmentID
+    </h2>
+
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header fw-semibold">Call Information</div>
+        <div class="card-body">
+
+            @if (Model.Recordings.Any())
+            {
+                var call = Model.Recordings.First();
+
+                <p><strong>Number:</strong> @call.NumberAssessedOn</p>
+                <p><strong>Length:</strong> @call.RecordingLength</p>
+                <p><strong>Date:</strong> @call.CallDate</p>
+
+                <button class="btn btn-primary"
+                        onclick="downloadRecording('@call.RecordingID')">
+                      Play / Download Recording
+                </button>
+            }
+            else
+            {
+                <p class="text-muted">No call details available.</p>
+            }
+        </div>
+    </div>
+
+
+
+    <div class="card shadow-sm">
+        <div class="card-header fw-semibold">Reassessor Questions</div>
+
+        <div class="card-body">
+            <form id="reassessForm">
+                @Html.AntiForgeryToken()
+                <table class="table table-bordered align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width:40%">Question</th>
+                            <th style="width:18%">Original Answer</th>
+                            <th style="width:22%">Your Note</th>
+                            <th style="width:20%">Your Answer</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var q in Model.Questions)
+                        {
+                            var qid = q.QuestionID;
+
+                            <tr>
+                                <td class="fw-semibold">@q.QuestionValue</td>
+
+                                <td style="font-size: 0.70rem; color: #555;">
+                                    <span class="badge rounded-pill bg-light text-dark border"
+                                          style="font-size: 0.70rem; padding: 3px 6px;">
+                                        @q.AssessorAnswer
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <textarea class="form-control reassess-note"
+                                          data-qid="@qid"
+                                          rows="3"
+                                          style="min-width:180px;"></textarea>
+                                </td>
+
+                                <td>
+                                    <div class="btn-group" role="group" aria-label="answer">
+
+                                        <button type="button"
+                                                class="btn btn-outline-success answer-btn"
+                                                data-qid="@qid"
+                                                data-value="yes">
+                                             Yes
+                                        </button>
+
+                                        <button type="button"
+                                                class="btn btn-outline-danger answer-btn"
+                                                data-qid="@qid"
+                                                data-value="no">
+                                             No
+                                        </button>
+
+                                        <button type="button"
+                                                class="btn btn-outline-warning answer-btn"
+                                                data-qid="@qid"
+                                                data-value="na">
+                                             N/A
+                                        </button>
+
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <button type="button"
+                        class="btn btn-success mt-3"
+                        onclick="saveReassessment()">
+                     Save Reassessment
+                </button>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const assessmentId = @Model.AssessmentID;
+
+        const questionIds = @Html.Raw(
+                    System.Text.Json.JsonSerializer.Serialize(
+                            Model.Questions.Select(q => q.QuestionID)
+                    )
+            );
+
+    const saveReassessmentUrl = '@Url.Action("SaveReassessment", "Manager")';
+    const assessmentsUrl = '@Url.Action("Assessments", "Manager")';
+    const getRecordingUrl = '@Url.Action("GetRecordingUrl", "Assessor")';
+
+        const selectedAnswers = {};
+
+        document.querySelectorAll(".answer-btn").forEach(btn => {
+            btn.addEventListener("click", function () {
+                const qid = this.dataset.qid;
+                const value = this.dataset.value;
+
+                selectedAnswers[qid] = value;
+
+                const group = this.closest(".btn-group");
+
+                group
+                    .querySelectorAll(".answer-btn")
+                    .forEach(b => b.classList.remove("active"));
+
+                this.classList.add("active");
+            });
+        });
+
+        function buildNotesPayload() {
+            const notes = {};
+
+            document.querySelectorAll(".reassess-note").forEach(textarea => {
+                const qid = textarea.dataset.qid;
+                const value = textarea.value?.trim();
+
+                if (value) {
+                    notes[qid] = value;
+                }
+            });
+
+            return notes;
+        }
+
+        function validateReassessmentPayload(payload) {
+            if (!payload.assessmentId || payload.assessmentId <= 0) {
+                return "Invalid assessment id.";
+            }
+
+            if (!payload.answers || Object.keys(payload.answers).length === 0) {
+                return "Please answer at least one reassessment question.";
+            }
+
+            const unansweredQuestions = questionIds.filter(qid => {
+                return !payload.answers[qid];
+            });
+
+            if (unansweredQuestions.length > 0) {
+                return "Please answer all reassessment questions before saving.";
+            }
+
+            return null;
+        }
+
+        function getAntiForgeryToken() {
+            return document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+        }
+
+        function saveReassessment() {
+            const payload = {
+                assessmentId: assessmentId,
+                answers: selectedAnswers,
+                notes: buildNotesPayload()
+            };
+
+            const validationError = validateReassessmentPayload(payload);
+
+            if (validationError) {
+                alert(validationError);
+                return;
+            }
+
+            fetch(saveReassessmentUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "RequestVerificationToken": getAntiForgeryToken()
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(async response => {
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    const message = result.message || "Failed to save reassessment.";
+                    throw new Error(message);
+                }
+
+                return result;
+            })
+            .then(() => {
+                alert("✔️ Reassessment saved!");
+                window.location.href = assessmentsUrl;
+            })
+            .catch(error => {
+
+                alert("❌ " + error.message);
+            });
+        }
+
+        function downloadRecording(id) {
+            fetch(getRecordingUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "RequestVerificationToken": getAntiForgeryToken()
+                },
+                body: JSON.stringify({ recordingId: id })
+            })
+            .then(async response => {
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error("Recording not found.");
+                }
+
+                return result;
+            })
+            .then(result => {
+                const recording = JSON.parse(result.url);
+                window.open(recording.url, "_blank");
+            })
+            .catch(error => {
+
+                alert(error.message);
+            });
+        }
+    </script>
+}

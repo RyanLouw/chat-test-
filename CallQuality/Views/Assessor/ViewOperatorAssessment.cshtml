@@ -1,0 +1,299 @@
+﻿@using CallQuality.Core.Manager.ReportManager.Models
+@model ViewAssessmentPageVM
+@{
+    var assessment = Model?.Assessment;
+
+    var scoreToUse = assessment?.IsReassessed == true
+        ? assessment.ReassessmentScore ?? 0
+        : assessment?.AssessmentScore ?? 0;
+
+    var possibleScore = assessment?.PossibleScore ?? 0;
+
+    var percentage = possibleScore > 0
+        ?Math.Truncate( (((double)scoreToUse / possibleScore) *100))
+        : 0;
+}
+
+<div class="container-fluid mt-4">
+
+    <!-- HEADER CARD -->
+    <div class="assessor-breakdown-wrapper">
+
+        <div class="assessor-breakdown-header">
+            <h4>Assessment Details</h4>
+        </div>
+
+        <div class="assessor-breakdown-content">
+
+            <div class="row">
+
+                <!-- LEFT SIDE DETAILS -->
+                <div class="col-12 col-md-8">
+
+                    <h3 class="fw-bold text-primary mb-3">@Model.Assessment.ContactPerson</h3>
+
+                    <table class="info-table">
+                        <tr>
+                            <th>Pharmacy Group</th>
+                            <td>@Model.Assessment.PharmacyGroup</td>
+                        </tr>
+                        <tr>
+                            <th>Pharmacy Name</th>
+                            <td>@Model.Assessment.PharmacyName</td>
+                        </tr>
+                        <tr>
+                            <th>Order Pharmacy Name</th>
+                            <td>@Model.Assessment.OrderPharmacyName</td>
+                        </tr>
+                        <tr>
+                            <th>System Name</th>
+                            <td>@Model.Assessment.SystemName</td>
+                        </tr>
+                        <tr>
+                            <th>Contact Person</th>
+                            <td>@Model.Assessment.ContactPerson</td>
+                        </tr>
+                        <tr>
+                            <th>Profile Number</th>
+                            <td>@Model.Assessment.ProfileNumber</td>
+                        </tr>
+                        <tr>
+                            <th>Assessed On</th>
+                            <td>@Model.Assessment.AssessedOn?.ToString("yyyy-MM-dd HH:mm")</td>
+                        </tr>
+                        <tr>
+                            <th>Assessed By</th>
+                            <td>@Model.Assessment.AssessedBy</td>
+                        </tr>
+                        <tr>
+                            <th>Reassessed By</th>
+                            <td>@Model.Assessment.ReassessedBy</td>
+                        </tr>
+                    </table>
+
+                </div>
+
+
+                <!-- RIGHT SIDE SCORE BUBBLES -->
+                <div class="col-12 col-md-4">
+
+                    <div class="row text-center">
+
+                        <div class="col-6 mb-4">
+                            <label class="bubbleHeaderAlign d-block">
+                                Assessment Score
+                            </label>
+
+                            <div class="percentage__Bubble">
+                                <span>@Model.Assessment.AssessmentScore</span>
+                            </div>
+                        </div>
+
+                        <div class="col-6 mb-4">
+                            <label class="bubbleHeaderAlign d-block">
+                                Assessment Total Score
+                            </label>
+
+                            <div class="percentage__Bubble">
+                                <span>@Model.Assessment.PossibleScore</span>
+                            </div>
+                        </div>
+
+                        @if (Model?.Assessment?.IsReassessed == true)
+                        {
+                            <div class="col-6 mb-4">
+                                <label class="bubbleHeaderAlign d-block">
+                                    Reassessment Score
+                                </label>
+
+                                <div class="percentage__Bubble __orangeBubble">
+                                    <span>@(Model.Assessment.ReassessmentScore ?? 0)</span>
+                                </div>
+                            </div>
+                        }
+
+                    </div>
+
+                    <!-- FINAL PERCENTAGE -->
+                    <div class="text-center mt-3">
+
+                        <label class="bubbleHeaderAlign d-block">
+                            @(Model.Assessment.IsReassessed == true
+                                ? "Reassessment Percentage"
+                                : "Assessment Percentage")
+                        </label>
+
+                        <div class="percentage__Bubble mx-auto mb-3
+                            @(Model.Assessment.IsReassessed == true ? "__orangeBubble" : "")">
+                            <span>@percentage%</span>
+                        </div>
+
+                        <button class="btn btn-primary btn-search"
+                                data-bs-toggle="modal"
+                                data-bs-target="#RecordingsModal">
+                            View Recordings
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+
+
+    <!-- QUESTIONS TABLE -->
+    <div class="assessor-breakdown-wrapper mt-4">
+
+        <div class="assessor-breakdown-header">
+            <h4>Questions & Answers</h4>
+        </div>
+
+        <div class="assessor-breakdown-content">
+
+            <table class="tracking-table" id="questionsTable">
+                <thead>
+                    <tr>
+                        <th>Question</th>
+                        <th>Score</th>
+                        <th>Answer</th>
+                        <th>Reassessor Answer</th>
+                        
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var q in Model.Questions)
+                    {
+                        <tr >
+                            <td class="question-text">@q.QuestionValue</td>
+                            <td>@q.Score</td>
+                            <td>@q.AssessorAnswer</td>
+                            <td>@q.ReassessorAnswer</td>
+                            
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- FEEDBACK SECTION -->
+    <div class="assessor-breakdown-wrapper mt-4">
+
+        <div class="assessor-breakdown-header">
+            <h4>Feedback</h4>
+        </div>
+
+        <div class="assessor-breakdown-content">
+
+            @if (!Model.Feedback.Any())
+            {
+                <p class="no-data">No feedback available.</p>
+            }
+            else
+            {
+                foreach (var fb in Model.Feedback)
+                {
+                    <div class="feedback-block mb-3">
+                        @Html.Raw(fb.FeedbackText)
+                    </div>
+                }
+            }
+
+        </div>
+    </div>
+
+
+
+
+    <!-- RECORDINGS MODAL -->
+    <div class="modal fade" id="RecordingsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+
+                <div class="modal-header gradient-header">
+                    <h5 class="modal-title">Call Recordings</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <table class="tracking-table">
+                        <thead>
+                            <tr>
+                                <th>Number</th>
+                                <th>Length</th>
+                                <th>Download</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var rec in Model.Recordings)
+                            {
+                                <tr>
+                                    <td>@rec.NumberAssessedOn</td>
+                                    <td>@rec.RecordingLength</td>
+                                    <td>
+                                        <button class="btn btn-primary btn-download"
+                                                onclick="downloadRecording('@rec.RecordingID')">
+                                            Download
+                                        </button>
+
+
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <script>
+
+        async function downloadRecording(id) {
+            AppLoader.show("Preparing recording download...");
+
+            try {
+                const response = await fetch('/Assessor/GetRecordingUrl', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ recordingId: id })
+                });
+
+                const res = await response.json();
+
+                if (!res.success) {
+                    alert("Recording not found.");
+                    return;
+                }
+
+                const url = JSON.parse(res.url).url;
+                window.open(url, "_blank");
+            }
+            catch (err) {
+
+                alert("Something went wrong while getting the recording.");
+            }
+            finally {
+                AppLoader.hide();
+            }
+        }
+
+    </script>
+}

@@ -1,0 +1,353 @@
+﻿@using CallQuality.Core.Manager.TrainingManager.Models
+@model TrainingDetailsPageVM
+
+@{
+    ViewData["Title"] = "Training Details";
+}
+
+<div class="container py-4">
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong>✔ Success!</strong> @TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>❌ Error!</strong> @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-lg rounded-4 border-0">
+        <div class="card-body p-4">
+
+            <h2 class="fw-bold text-primary mb-4">New Training Register</h2>
+
+            <form asp-action="Save"
+                  method="post"
+                  enctype="multipart/form-data"
+                  id="trainingForm">
+
+                @Html.AntiForgeryToken()
+
+                <div class="row g-4">
+
+                    <!-- Training Topic -->
+                    <div class="col-12">
+                        <label class="fw-semibold">Training Topic</label>
+                        <input asp-for="NewTraining.TrainingTopic" class="form-control page-input" />
+                        <span asp-validation-for="NewTraining.TrainingTopic" class="text-danger"></span>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="col-12">
+                        <label class="fw-semibold">Training Description</label>
+                        <textarea asp-for="NewTraining.TrainingDescription"
+                                  class="form-control page-input"
+                                  rows="3"></textarea>
+                        <span asp-validation-for="NewTraining.TrainingDescription" class="text-danger"></span>
+                    </div>
+
+                    <!-- Time Duration -->
+                    <div class="col-md-6">
+                        <label class="fw-semibold">Time Duration</label>
+                        <select asp-for="NewTraining.TimeDuration" class="form-select page-input">
+                            <option value="0">-- Select Time Duration --</option>
+
+                            @foreach (var d in Model.TimeDurations)
+                            {
+                                <option value="@d.DurationValue">@d.DurationText</option>
+                            }
+                        </select>
+                        <span asp-validation-for="NewTraining.TimeDuration" class="text-danger"></span>
+                    </div>
+
+                    <!-- Due Date -->
+                    <div class="col-md-6">
+                        <label class="fw-semibold">Due Date</label>
+                        <input asp-for="NewTraining.DueDate" type="date" class="form-control page-input" />
+                        <span asp-validation-for="NewTraining.DueDate" class="text-danger"></span>
+                    </div>
+
+                    <!-- Facilitator -->
+                    <div class="col-12">
+                        <label class="fw-semibold">Facilitator</label>
+                        <select asp-for="NewTraining.TrainingFacilitator.UserId" class="form-select page-input">
+                            <option value="">-- Select Facilitator --</option>
+
+                            @foreach (var f in Model.Facilitators)
+                            {
+                                <option value="@f.UserId">@f.DisplayName</option>
+                            }
+                        </select>
+                        <span asp-validation-for="NewTraining.TrainingFacilitator.UserId" class="text-danger"></span>
+                    </div>
+
+                    <!-- Trainees -->
+                    <div class="col-12">
+                        <label class="fw-semibold">Trainees</label>
+
+                        <select id="traineesTagBox"
+                                asp-for="NewTraining.SelectedTraineeIds"
+                                class="form-select"
+                                multiple>
+                            @foreach (var t in Model.Trainees)
+                            {
+                                <option value="@t.UserId" data-guid="@t.UserId">@t.DisplayName</option>
+                            }
+                        </select>
+
+                        <span asp-validation-for="NewTraining.SelectedTraineeIds" class="text-danger"></span>
+                    </div>
+
+                    <!-- Leaders - NOT REQUIRED -->
+                    <div class="col-md-6">
+                        <label class="fw-semibold">Leader Name</label>
+
+                        <select id="leaderSelect"
+                                name="NewTraining.LeaderId"
+                                class="form-select page-input"
+                                data-val="false">
+                            <option value="">-- Select Leader --</option>
+
+                            @foreach (var l in Model.Leaders)
+                            {
+                                <option value="@l.UserId">@l.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Groups - NOT REQUIRED -->
+                    <div class="col-md-6">
+                        <label class="fw-semibold">Group Name</label>
+
+                        <select id="groupSelect"
+                                name="NewTraining.GroupId"
+                                class="form-select page-input"
+                                data-val="false">
+                            <option value="">-- Select Group --</option>
+
+                            @foreach (var g in Model.Groups)
+                            {
+                                <option value="@g.GroupId">@g.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- File Upload - NOT REQUIRED -->
+                    <div class="col-12">
+                        <label class="fw-semibold">Upload Supporting Documents</label>
+                        <input type="file" class="form-control page-input" name="files" multiple />
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="col-12 d-flex justify-content-end gap-3 mt-3">
+                        <a href="/TrainingRegister" class="btn btn-secondary rounded-pill px-4">Cancel</a>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4">Save</button>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    <script>
+
+         const getUsersByGroupUrl = '@Url.Action("GetUsersByGroup", "TrainingRegister", new { id = "__id__" })';
+        const getUsersByLeaderUrl = '@Url.Action("GetUsersByLeader", "TrainingRegister", new { id = "__id__" })';
+
+        function getUsersUrl(type, id) {
+            const template = type === "Group"
+                ? getUsersByGroupUrl
+                : getUsersByLeaderUrl;
+
+            return template.replace("__id__", encodeURIComponent(id));
+        }
+
+
+        $(document).ready(function () {
+             $('#leaderSelect, #groupSelect').removeAttr('data-val data-val-required required');
+
+            $('#traineesTagBox').select2({
+                placeholder: "Select trainees...",
+                width: '100%'
+            });
+
+            $('#trainingForm').on('submit', function (e) {
+                let isValid = true;
+
+                clearCustomValidation();
+
+                const topic = $('[name="NewTraining.TrainingTopic"]').val();
+                const description = $('[name="NewTraining.TrainingDescription"]').val();
+                const timeDuration = $('[name="NewTraining.TimeDuration"]').val();
+                const dueDate = $('[name="NewTraining.DueDate"]').val();
+                const facilitator = $('[name="NewTraining.TrainingFacilitator.UserId"]').val();
+                const trainees = $('#traineesTagBox').val();
+
+                if (!topic || topic.trim() === '') {
+                    showValidation('[name="NewTraining.TrainingTopic"]', 'Training Topic is required');
+                    isValid = false;
+                }
+
+                if (!description || description.trim() === '') {
+                    showValidation('[name="NewTraining.TrainingDescription"]', 'Training Description is required');
+                    isValid = false;
+                }
+
+                if (!timeDuration || timeDuration === '0') {
+                    showValidation('[name="NewTraining.TimeDuration"]', 'Time Duration is required');
+                    isValid = false;
+                }
+
+                if (!dueDate) {
+                    showValidation('[name="NewTraining.DueDate"]', 'Due Date is required');
+                    isValid = false;
+                }
+
+                if (!facilitator) {
+                    showValidation('[name="NewTraining.TrainingFacilitator.UserId"]', 'Facilitator is required');
+                    isValid = false;
+                }
+
+                if (!trainees || trainees.length === 0) {
+                    $('#traineesTagBox')
+                        .next('.select2-container')
+                        .find('.select2-selection')
+                        .addClass('is-invalid-select2');
+
+                    $('[data-valmsg-for="NewTraining.SelectedTraineeIds"]')
+                        .text('At least one trainee must be selected');
+
+                    isValid = false;
+                }
+
+                if (!isValid) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+
+                return true;
+            });
+
+            $('#traineesTagBox').on('change', function () {
+                const trainees = $(this).val();
+
+                if (trainees && trainees.length > 0) {
+                    $('#traineesTagBox')
+                        .next('.select2-container')
+                        .find('.select2-selection')
+                        .removeClass('is-invalid-select2');
+
+                    $('[data-valmsg-for="NewTraining.SelectedTraineeIds"]').text('');
+                }
+            });
+
+            $('#groupSelect').on('change', function () {
+                const groupId = $(this).val();
+
+                if (groupId) {
+                    fetchUsersFor("Group", groupId);
+                }
+            });
+
+            $('#leaderSelect').on('change', function () {
+                const leaderId = $(this).val();
+
+                if (leaderId) {
+                    fetchUsersFor("Leader", leaderId);
+                }
+            });
+
+        function fetchUsersFor(type, id) {
+
+            $.ajax({
+                url: getUsersUrl(type, id),
+                type: "GET",
+                success: function (result) {
+  
+
+                    const returnedGuids = result.map(x => {
+                        if (typeof x === "object") {
+                            return (x.id_Guid ?? x.ID_GUID ?? x.idGuid ?? x.userId ?? x.UserId ?? "").toString().toLowerCase();
+                        }
+
+                        return x.toString().toLowerCase();
+                    }).filter(x => x !== "");
+
+
+
+                    const valuesToSelect = [];
+
+                    $('#traineesTagBox option').each(function () {
+                        const optionValue = this.value;
+                        const optionGuid = ($(this).data('guid') ?? '').toString().toLowerCase();
+
+                        if (returnedGuids.includes(optionGuid) || returnedGuids.includes(optionValue.toLowerCase())) {
+                            valuesToSelect.push(optionValue);
+                        }
+                    });
+
+
+                    const missingGuids = returnedGuids.filter(guid => {
+                        return !$('#traineesTagBox option').toArray().some(option => {
+                            const optionValue = option.value.toLowerCase();
+                            const optionGuid = ($(option).data('guid') ?? '').toString().toLowerCase();
+
+                            return optionGuid === guid || optionValue === guid;
+                        });
+                    });
+
+
+                    const current = $('#traineesTagBox').val() || [];
+                    const merged = [...new Set([...current, ...valuesToSelect])];
+
+                    $('#traineesTagBox')
+                        .val(merged)
+                        .trigger('change');
+
+                },
+                error: function (xhr) {
+                 
+                    alert("Could not load users for this " + type);
+                }
+            });
+        }
+
+
+
+
+            function showValidation(selector, message) {
+                const input = $(selector);
+                input.addClass('is-invalid');
+
+                const fieldName = input.attr('name');
+
+                $(`[data-valmsg-for="${fieldName}"]`).text(message);
+            }
+
+            function clearCustomValidation() {
+                $('.is-invalid').removeClass('is-invalid');
+                $('.is-invalid-select2').removeClass('is-invalid-select2');
+                $('[data-valmsg-for]').text('');
+            }
+        });
+    </script>
+
+    <style>
+        .is-invalid-select2 {
+            border: 1px solid #dc3545 !important;
+            border-radius: 0.375rem;
+        }
+    </style>
+}

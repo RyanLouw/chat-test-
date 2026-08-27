@@ -1,0 +1,470 @@
+﻿@using CallQuality.Core.Manager.AssessmentsManager.Models
+@model NewAssessmentVM
+
+<div class="container mt-5">
+
+    <div id="pageLoader" class="loader-overlay" style="display:none;">
+        <div class="loader-spinner"></div>
+    </div>
+
+    <div class="page-controls align-items-end">
+        <div class="d-flex flex-column flex-grow-1">
+            <label class="fw-semibold mb-1">Select Agent</label>
+            <select id="agentSelect" asp-for="SelectedAgentId">
+                <option value="">-- Select an Agent --</option>
+
+                @foreach (var agent in Model.Agents)
+                {
+                    <option value="@agent.ID_Guid"
+                            data-name="@agent.DisplayName"
+                            data-ext="@agent.Extension"
+                            data-dept="@agent.Department"
+                            data-count="@agent.MonthlyAssessmentCount"
+                            data-color="@agent.StatusColor">
+                        @agent.DisplayName (@agent.Extension)
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div class="d-flex align-items-end">
+            <button id="btnSearchInteractions"
+                    class="btn btn-primary ms-3"
+                    style="height: 46px;">
+                Search Interactions
+            </button>
+
+            <button id="btnManualAssessment" class="btn btn-outline-primary ms-2" style="height:46px;">
+                Manual Assessment (Calls)
+            </button>
+
+        </div>
+    </div>
+
+    <div id="randomInteractionsSection" class="mt-5"></div>
+    <div id="allInteractionsSection" class="mt-5"></div>
+
+</div>
+
+@section Scripts {
+    <script>
+
+        function ShowLoader() { $("#pageLoader").show(); }
+        function HideLoader() { $("#pageLoader").hide(); }
+
+        $(document).ready(function () {
+
+            function formatAgent(option) {
+                if (!option.id) return option.text;
+
+                let el = $(option.element);
+                let name = el.data("name");
+                let ext = el.data("ext");
+                let dept = el.data("dept");
+                let count = el.data("count");
+                let color = el.data("color");
+
+                let badgeClass =
+                    color === "Green" ? "badge-green" :
+                    color === "Yellow" ? "badge-yellow" :
+                    "badge-red";
+
+                return $(`
+                    <div style="padding:6px;">
+                        <div style="font-weight:600;">
+                            ${name} (${ext})
+                            <span class="agent-status-badge ${badgeClass}"></span>
+                        </div>
+                        <div class="text-muted" style="font-size:0.9rem;">Department: ${dept}</div>
+                        <div class="text-muted" style="font-size:0.9rem;">Assessments this month: ${count}</div>
+                    </div>
+                `);
+            }
+
+            function formatAgentSelection(option) {
+                if (!option.id) return option.text;
+
+                let el = $(option.element);
+                let name = el.data("name");
+                let ext = el.data("ext");
+
+                return `${name} (${ext})`;
+            }
+
+            $("#agentSelect").select2({
+                width: '100%',
+                templateResult: formatAgent,
+                templateSelection: formatAgentSelection,
+                dropdownAutoWidth: true
+            });
+
+            async function doSearch(isManual) {
+
+                let selected = $("#agentSelect").select2('data')[0];
+                if (!selected) {
+                    alert("Please select an agent first.");
+                    return;
+                }
+
+                let el = $(selected.element);
+
+                let agent = {
+                    ID_Guid: el.val(),
+                    DisplayName: el.data("name"),
+                    Extension: String(el.data("ext")),
+                    Department: el.data("dept"),
+                    MonthlyAssessmentCount: el.data("count"),
+                    StatusColor: el.data("color")
+                };
+
+                ShowLoader();
+
+                try {
+                    const url = isManual
+                        ? '/Assessor/SearchInteractions?isManual=true'
+                        : '/Assessor/SearchInteractions';
+
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(agent)
+                    });
+
+                    const model = await response.json();
+
+                    $("#randomInteractionsSection").html("");
+                    $("#allInteractionsSection").html("");
+
+                    if (model.isManulaAssessment === true) {
+                        renderCallInteractions(model.callInteractions);
+                        return;
+                    }
+
+
+                    if (model.pspInteractions && model.pspInteractions.length > 0) {
+                        renderPspInteractions(model.pspInteractions);
+                        return;
+                    }
+
+                    renderRandomInteractions(model.randomInteractions);
+                    renderAllInteractions(model.interactions);
+                }
+                finally {
+                    HideLoader();
+                }
+            }
+
+            $("#btnSearchInteractions").on("click", async function () {
+                await doSearch(false);
+            });
+
+            $("#btnManualAssessment").on("click", async function () {
+                await doSearch(true);
+            });
+
+        });
+
+
+        function renderRandomInteractions(list) {
+            if (!list || list.length === 0) {
+                $("#randomInteractionsSection").html("");
+                return;
+            }
+
+            let html = `
+                <h3 class="mt-3">Suggested Interactions (Random 5)</h3>
+                <table class="table table-bordered table-striped mt-2">
+                    <thead>
+                        <tr>
+                            <th>Contact ID</th>
+                            <th>Order ID</th>
+                            <th>Family Identifier</th>
+                            <th>Extension</th>
+                            <th>Pharmacy Group</th>
+                            <th>Pharmacy Name</th>
+                            <th>Profile Number</th>
+                            <th>Agent Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            list.forEach(x => {
+                let encoded = encodeURIComponent(JSON.stringify(x));
+
+                html += `
+                    <tr class="clickable-row" data-item="${encoded}">
+                        <td>${x.contactID}</td>
+                        <td>${x.orderID}</td>
+                        <td>${x.familyIdentifier}</td>
+                        <td>${x.extension ?? ""}</td>
+                        <td>${x.pharmacyGroup ?? ""}</td>
+                        <td>${x.pharmacyName ?? ""}</td>
+                        <td>${x.profile ?? ""}</td>
+                        <td>${x.agentName ?? ""}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            $("#randomInteractionsSection").html(html);
+
+            $(".clickable-row").off("click").on("click", function () {
+                let obj = JSON.parse(decodeURIComponent($(this).data("item")));
+                getInteraction(obj);
+            });
+        }
+
+        function renderAllInteractions(list) {
+            if (!list || list.length === 0) {
+                $("#allInteractionsSection").html("");
+                return;
+            }
+
+            let html = `
+                <h3 class="mt-5">All Interactions</h3>
+                <table class="table table-bordered table-striped mt-2">
+                    <thead>
+                        <tr>
+                            <th>Contact ID</th>
+                            <th>Order ID</th>
+                            <th>Family Identifier</th>
+                            <th>Extension</th>
+                            <th>Pharmacy Group</th>
+                            <th>Pharmacy Name</th>
+                            <th>Profile Number</th>
+                            <th>Agent Name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            list.forEach(x => {
+                let encoded = encodeURIComponent(JSON.stringify(x));
+
+                html += `
+                    <tr class="clickable-row" data-item="${encoded}">
+                        <td>${x.contactID}</td>
+                        <td>${x.orderID}</td>
+                        <td>${x.familyIdentifier}</td>
+                        <td>${x.extension ?? ""}</td>
+                        <td>${x.pharmacyGroup ?? ""}</td>
+                        <td>${x.pharmacyName ?? ""}</td>
+                        <td>${x.profile ?? ""}</td>
+                        <td>${x.agentName ?? ""}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            $("#allInteractionsSection").html(html);
+
+            $(".clickable-row").off("click").on("click", function () {
+                let obj = JSON.parse(decodeURIComponent($(this).data("item")));
+                getInteraction(obj);
+            });
+        }
+
+
+        function renderPspInteractions(list) {
+            if (!list || list.length === 0) {
+                $("#allInteractionsSection").html("");
+                return;
+            }
+
+            let html = `
+                <h3 class="mt-5">PSP Interactions</h3>
+                <table class="table table-bordered table-striped mt-2">
+                    <thead>
+                        <tr>
+                            <th>PSP Name</th>
+                            <th>Patient ID</th>
+                            <th>Extension</th>
+                            <th>Contact Person</th>
+                            <th>HW Number</th>
+                            <th>Agent Name</th>
+                            <th>Cell Number</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            list.forEach(x => {
+                let encoded = encodeURIComponent(JSON.stringify(x));
+
+                html += `
+                    <tr class="clickable-row" data-item="${encoded}">
+                        <td>${x.pspName ?? ""}</td>
+                        <td>${x.patientID ?? ""}</td>
+                        <td>${x.extension ?? ""}</td>
+                        <td>${x.contactPerson ?? ""}</td>
+                        <td>${x.hwNumber ?? ""}</td>
+                        <td>${x.agentName ?? ""}</td>
+                        <td>${x.cellNumber ?? ""}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            $("#allInteractionsSection").html(html);
+
+            $(".clickable-row").off("click").on("click", function () {
+                let obj = JSON.parse(decodeURIComponent($(this).data("item")));
+                getPspInteraction(obj);
+            });
+        }
+
+
+        function renderCallInteractions(list) {
+            if (!list || list.length === 0) {
+                $("#allInteractionsSection").html(`
+                    <div class="alert alert-warning mt-4">
+                        No calls found for yesterday + today.
+                    </div>
+                `);
+                return;
+            }
+
+            let html = `
+                <h3 class="mt-5">Manual Assessment Calls (Yesterday + Today)</h3>
+                <div class="text-muted mb-2">Only answered calls are selectable.</div>
+
+                <table class="table table-bordered table-striped mt-2">
+                    <thead>
+                        <tr>
+                            <th>Call Date</th>
+                            <th>Extension</th>
+                            <th>Duration</th>
+                            <th>Direction</th>
+                            <th>Caller Number</th>
+                            <th>Caller Name</th>
+                            <th>Answered</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            list.forEach(x => {
+                let encoded = encodeURIComponent(JSON.stringify(x));
+                let isAnswered = x.isAnswered === true;
+
+                let rowClass = isAnswered ? "clickable-row" : "non-clickable-row";
+                let answeredBadge = isAnswered
+                    ? `<span class="badge bg-success">Yes</span>`
+                    : `<span class="badge bg-secondary">No</span>`;
+
+                let callDate = x.callDateTime
+                    ? new Date(x.callDateTime).toLocaleString()
+                    : "";
+
+                html += `
+                    <tr class="${rowClass}" data-answered="${isAnswered}" data-item="${encoded}">
+                        <td>${callDate}</td>
+                        <td>${x.extension ?? ""}</td>
+                        <td>${x.durationMinutes ?? ""}</td>
+                        <td>${x.incoming ?? ""}</td>
+                        <td>${x.callerNumber ?? ""}</td>
+                        <td>${x.callerFullName ?? ""}</td>
+                        <td>${answeredBadge}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            $("#allInteractionsSection").html(html);
+
+
+            $(".clickable-row").off("click").on("click", function () {
+                let answered = $(this).data("answered") === true;
+                if (!answered) return;
+
+                let obj = JSON.parse(decodeURIComponent($(this).data("item")));
+                getCallInteraction(obj);
+            });
+        }
+
+
+        async function getInteraction(item) {
+            ShowLoader();
+            try {
+                const result = await fetch('/Assessor/SelectInteraction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item)
+                });
+
+                if (result.redirected) {
+                    window.location.href = result.url;
+                } else {
+                    const html = await result.text();
+                    document.open();
+                    document.write(html);
+                    document.close();
+                }
+            }
+            finally {
+                HideLoader();
+            }
+        }
+
+        async function getPspInteraction(item) {
+            ShowLoader();
+            try {
+                const result = await fetch('/Assessor/SelectPspInteraction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item)
+                });
+
+                if (result.redirected) {
+                    window.location.href = result.url;
+                } else {
+                    const html = await result.text();
+                    document.open();
+                    document.write(html);
+                    document.close();
+                }
+            }
+            finally {
+                HideLoader();
+            }
+        }
+
+
+        async function getCallInteraction(item) {
+            ShowLoader();
+            try {
+                const result = await fetch('/Assessor/SelectCallInteraction', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item)
+                });
+
+                if (result.redirected) {
+                    window.location.href = result.url;
+                } else {
+                    const html = await result.text();
+                    document.open();
+                    document.write(html);
+                    document.close();
+                }
+            }
+            finally {
+                HideLoader();
+            }
+        }
+
+
+    </script>
+
+    <style>
+        .non-clickable-row {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .clickable-row {
+            cursor: pointer;
+        }
+    </style>
+}

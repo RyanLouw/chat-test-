@@ -1,0 +1,133 @@
+﻿@using CallQuality.Core.Manager.Models.CallQualityDTOs
+
+@model List<AssessmentDTO>
+
+<div class="table-responsive shadow-sm rounded over-assessment-table-wrapper">
+    <table class="table over-assessment-table align-middle">
+        <thead class="over-assessment-header text-center">
+            <tr>
+                <th>Assessment Type</th>
+                <th>Extension</th>
+                <th>Family Identifier</th>
+                <th>Pharmacy Group</th>
+                <th>Pharmacy Name</th>
+                <th>Assessment Score</th>
+                <th>Assessed By</th>
+                <th>Assessed On</th>
+                <th>Reassessed By</th>
+                <th>Reassessment Score</th>
+                <th>Reassessed On</th>
+                <th></th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @if (Model?.Any() ?? false)
+            {
+                int index = 0;
+
+                foreach (var a in Model)
+                {
+                    var collapseId = $"collapseA_{a.AssessmentId}_{index}";
+
+                    <tr class="over-assessment-row"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#@collapseId"
+                        aria-expanded="false"
+                        style="cursor: pointer;">
+
+                        <td>@(a.AssessmentType?.TypeName ?? "Unknown")</td>
+                        <td>@a.Extension</td>
+                        <td>@a.FamilyIdentifier</td>
+                        <td>@a.PharmacyGroup</td>
+                        <td>@a.PharmacyName</td>
+                        <td>@a.AssessmentScore</td>
+                        <td>@a.AssessedBy</td>
+                        <td>@(a.AssessedOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+                        <td>@(string.IsNullOrWhiteSpace(a.ReassessedBy) ? "-" : a.ReassessedBy)</td>
+                        <td>@(a.ReassessmentScore?.ToString() ?? "-")</td>
+                        <td>@(a.ReassessedOn?.ToString("yyyy-MM-dd") ?? "-")</td>
+
+                        <td class="text-center">
+                            <i class="bi bi-chevron-down text-primary toggle-icon"></i>
+                        </td>
+                    </tr>
+
+                    <tr class="collapse bg-light over-assessment-detail" id="@collapseId">
+                        <td colspan="12">
+                            <div class="p-3">
+
+                                @if (a.IsReassessed != true)
+                                {
+                                    <div class="d-flex justify-content-end mb-2">
+                                        <a class="btn btn-sm btn-warning js-show-loader"
+                                           href="/Manager/Reassess/@a.AssessmentId"
+                                           data-loader-text="Opening reassessment...">
+                                            Reassess This Assessment
+                                        </a>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="d-flex justify-content-end mb-2">
+                                        <span class="badge bg-success px-3 py-2">
+                                            Already Reassessed
+                                        </span>
+                                    </div>
+                                }
+
+                                <table class="table table-sm table-striped mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Question</th>
+                                            <th>Assessor Answer</th>
+                                            <th>Not Applicable</th>
+                                            <th>Reassessor Answer</th>
+                                            <th>Score</th>
+                                            <th>Reassessor Note</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        @if (a.AssessmentDetails?.Any() ?? false)
+                                        {
+                                            foreach (var d in a.AssessmentDetails)
+                                            {
+                                                <tr>
+                                                    <td>@d.Question.QuestionValue</td>
+                                                    <td>@d.AssessorAnswer</td>
+                                                    <td>@(d.IsNa ? "✅" : "❌")</td>
+                                                    <td>@d.ReassessorAnswer</td>
+                                                    <td>@d.Score</td>
+                                                    <td>@d.ReassessorNote</td>
+                                                </tr>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <tr>
+                                                <td colspan="6" class="text-center text-muted">
+                                                    No details available.
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+
+                    index++;
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="12" class="text-center text-muted">
+                        No assessments found.
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
