@@ -98,6 +98,17 @@ public class ManagerAssessmentTests
             await assessmentsPage
                 .OpenSelectedReassessmentAsync();
 
+        await Assertions
+            .Expect(reassessmentPage.Heading)
+            .ToBeVisibleAsync();
+
+        await Assertions
+            .Expect(reassessmentPage.RecordingButton)
+            .ToBeVisibleAsync();
+
+        await Assertions
+            .Expect(reassessmentPage.SaveButton)
+            .ToBeVisibleAsync();
 
         await reassessmentPage
             .CompleteAllQuestionsAsync();
